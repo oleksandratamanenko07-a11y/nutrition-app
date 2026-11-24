@@ -19,6 +19,25 @@ export interface Profile {
   onboarded: boolean;
 }
 
+export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+export interface Entry {
+  id: string;
+  entry_date: string;
+  meal: Meal;
+  name: string;
+  amount_g: number;
+  kcal_100: number;
+  protein_100: number;
+  fat_100: number;
+  carbs_100: number;
+}
+
+export interface Day {
+  entries: Entry[];
+  water_ml: number;
+}
+
 export type ApiErrorKind = 'offline' | 'unauthorized' | 'invalid' | 'server';
 
 export class ApiError extends Error {
@@ -48,6 +67,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await res.json()) as T;
 }
 
+// ---------- Профіль ----------
+
 export async function getProfile(): Promise<Profile> {
   const r = await request<{ profile: Profile }>('/api/profile');
   return r.profile;
@@ -75,4 +96,66 @@ export async function saveProfile(input: ProfileInput): Promise<Profile> {
     body: JSON.stringify(input),
   });
   return r.profile;
+}
+
+// ---------- Щоденник ----------
+
+function normEntry(e: Entry): Entry {
+  return {
+    ...e,
+    amount_g: Number(e.amount_g),
+    kcal_100: Number(e.kcal_100),
+    protein_100: Number(e.protein_100),
+    fat_100: Number(e.fat_100),
+    carbs_100: Number(e.carbs_100),
+  };
+}
+
+export async function getDay(date: string): Promise<Day> {
+  const r = await request<{ entries: Entry[]; water_ml: number }>(
+    `/api/diary?date=${encodeURIComponent(date)}`,
+  );
+  return { entries: r.entries.map(normEntry), water_ml: Number(r.water_ml) };
+}
+
+export interface NewEntry {
+  date: string;
+  meal: Meal;
+  name: string;
+  amount_g: number;
+  kcal_100: number;
+  protein_100: number;
+  fat_100: number;
+  carbs_100: number;
+}
+
+export async function addEntry(input: NewEntry): Promise<Entry> {
+  const r = await request<{ entry: Entry }>('/api/diary', {
+    method: 'POST',
+    body: JSON.stringify({ type: 'entry', ...input }),
+  });
+  return normEntry(r.entry);
+}
+
+export async function updateEntry(
+  id: string,
+  patch: { amount_g?: number; meal?: Meal },
+): Promise<Entry> {
+  const r = await request<{ entry: Entry }>('/api/diary', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, ...patch }),
+  });
+  return normEntry(r.entry);
+}
+
+export async function deleteEntry(id: string): Promise<void> {
+  await request<{ ok: boolean }>(`/api/diary?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function addWater(date: string, amountMl: number): Promise<number> {
+  const r = await request<{ water_ml: number }>('/api/diary', {
+    method: 'POST',
+    body: JSON.stringify({ type: 'water', date, amount_ml: amountMl }),
+  });
+  return Number(r.water_ml);
 }
