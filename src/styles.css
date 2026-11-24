@@ -587,3 +587,19 @@ button.add {
     opacity: 1;
   }
 }
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.row:first-of-type {
+  border-top: 0;
+}
+
+button.danger.neutral {
+  border-color: var(--border);
+  color: var(--muted);
+}
