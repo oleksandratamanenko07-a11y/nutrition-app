@@ -52,7 +52,8 @@ export function verifyInitData(
 export function getUser(req: VercelRequest): TgUser | null {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return null;
-  const header = req.headers.authorization ?? '';
+  const raw = req.headers.authorization;
+  const header = Array.isArray(raw) ? raw[0] ?? '' : raw ?? '';
   if (!header.startsWith('tma ')) return null;
   return verifyInitData(header.slice(4), token);
 }
