@@ -6,13 +6,14 @@ import { initData, localDate } from './lib/telegram';
 import { Diary } from './components/Diary';
 import { Home } from './components/Home';
 import { Onboarding } from './components/Onboarding';
+import { ProfileTab } from './components/ProfileTab';
 
 type State =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
   | { kind: 'ready'; profile: Profile };
 
-type Tab = 'home' | 'diary';
+type Tab = 'home' | 'diary' | 'profile';
 
 function addDays(date: string, n: number): string {
   const [y, m, d] = date.split('-').map(Number);
@@ -87,11 +88,18 @@ function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
         </svg>
         <span>{t.nav.diary}</span>
       </button>
+      <button type="button" className={tab === 'profile' ? 'active' : ''} onClick={() => onChange('profile')}>
+        <svg viewBox="0 0 24 24" {...icon} aria-hidden="true">
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+        </svg>
+        <span>{t.nav.profile}</span>
+      </button>
     </nav>
   );
 }
 
-function Main({ profile }: { profile: Profile }) {
+function Main({ profile, onEdit }: { profile: Profile; onEdit: () => void }) {
   const today = localDate();
   const [date, setDate] = useState(today);
   const [tab, setTab] = useState<Tab>('home');
@@ -113,7 +121,7 @@ function Main({ profile }: { profile: Profile }) {
   return (
     <div className="app">
       <main className="page">
-        <DateBar date={date} today={today} onChange={setDate} />
+        {tab !== 'profile' && <DateBar date={date} today={today} onChange={setDate} />}
 
         {banner && (
           <div className="banner">
@@ -124,7 +132,7 @@ function Main({ profile }: { profile: Profile }) {
           </div>
         )}
 
-        {!day && loading && (
+        {!day && loading && tab !== 'profile' && (
           <div className="center-block">
             <div className="spinner" aria-label={t.loading} />
           </div>
@@ -132,6 +140,7 @@ function Main({ profile }: { profile: Profile }) {
 
         {day && tab === 'home' && <Home profile={profile} day={day} onWater={onWater} />}
         {day && tab === 'diary' && <Diary date={date} entries={day.entries} reload={reload} />}
+        {tab === 'profile' && <ProfileTab profile={profile} onEdit={onEdit} />}
       </main>
       <TabBar tab={tab} onChange={setTab} />
     </div>
@@ -140,6 +149,7 @@ function Main({ profile }: { profile: Profile }) {
 
 export default function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const [editing, setEditing] = useState(false);
 
   const load = useCallback(async () => {
     setState({ kind: 'loading' });
@@ -185,5 +195,18 @@ export default function App() {
     return <Onboarding onDone={(p) => setState({ kind: 'ready', profile: p })} />;
   }
 
-  return <Main profile={profile} />;
+  if (editing) {
+    return (
+      <Onboarding
+        initial={profile}
+        onCancel={() => setEditing(false)}
+        onDone={(p) => {
+          setState({ kind: 'ready', profile: p });
+          setEditing(false);
+        }}
+      />
+    );
+  }
+
+  return <Main profile={profile} onEdit={() => setEditing(true)} />;
 }
