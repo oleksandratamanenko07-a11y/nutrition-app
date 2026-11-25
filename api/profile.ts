@@ -108,6 +108,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         );
       if (weightError) throw weightError;
 
+      // Історія цілей: з сьогоднішнього дня діє ця норма, а минулі дні лишаються з попередньою
+      const { error: goalError } = await supabase.from('goal_history').upsert(
+        {
+          owner_id: user.id,
+          effective_from: today,
+          kcal_goal: Math.round(kcal),
+          protein_goal_g: Math.round(protein),
+          fat_goal_g: Math.round(fat),
+          carbs_goal_g: Math.round(carbs),
+        },
+        { onConflict: 'owner_id,effective_from' },
+      );
+      if (goalError) console.error('goal_history error', goalError);
+
       return res.status(200).json({ profile: data });
     }
 
