@@ -120,7 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const image = typeof b.image_url === 'string' && /^https:\/\//.test(b.image_url) && b.image_url.length <= 500
           ? b.image_url
           : null;
-        const source = b.source === 'openfoodfacts' ? 'openfoodfacts' : 'manual';
+        const source = b.source === 'openfoodfacts' ? 'openfoodfacts' : b.source === 'recipe' ? 'recipe' : 'manual';
         const details = { barcode, brand, country, image_url: image, source };
 
         // Продукт зберігаємо в особисту базу (без дублікатів).
@@ -171,9 +171,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           foodId = food.id;
         }
 
+        // Склад страви на момент додавання: правка страви потім не змінює цей запис
+        let snapshot: unknown = null;
+        if (source === 'recipe' && Array.isArray(b.recipe_snapshot) && b.recipe_snapshot.length <= 30) {
+          const items = (b.recipe_snapshot as Record<string, unknown>[]).map((i) => ({
+            name: typeof i?.name === 'string' ? i.name.slice(0, 120) : '',
+            amount_g: num(i?.amount_g, 0, 5000),
+            kcal_100: num(i?.kcal_100, 0, 900),
+            protein_100: num(i?.protein_100, 0, 100),
+            fat_100: num(i?.fat_100, 0, 100),
+            carbs_100: num(i?.carbs_100, 0, 100),
+          }));
+          if (items.every((i) => i.name && i.amount_g !== null)) snapshot = items;
+        }
+
         const { data: entry, error: entryError } = await supabase
           .from('diary_entries')
           .insert({
+            recipe_snapshot: snapshot,
             owner_id: uid,
             entry_date: date,
             meal,
