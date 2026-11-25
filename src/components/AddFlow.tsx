@@ -2,18 +2,24 @@ import { useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/uk';
 import {
   addEntry,
+  applyTemplate,
+  deleteTemplate,
+  frequentFoods,
   getRecipes,
+  getTemplates,
   lookupBarcode,
   recentFoods,
   searchFoods,
   type SearchResult,
   type Food,
+  type FrequentFood,
   type Meal,
+  type MealTemplate,
   type Recipe,
 } from '../lib/api';
 import type { Ingredient } from '../lib/recipe';
 import { DishAddForm } from './DishAdd';
-import { portion } from '../lib/calc';
+import { portion, sum } from '../lib/calc';
 import { fmtG, fmtKcal } from '../lib/day';
 import { errorText, MealPicker, ok, parseNum, Sheet } from './ui';
 import { Scanner } from './Scanner';
@@ -40,6 +46,8 @@ export interface Draft {
   missing: Record<Nutrient, boolean>;
   fromKj: boolean;
   suspicious: boolean;
+  /** Кількість, підставлена у форму (наприклад, остання використана) */
+  amount?: string;
 }
 
 export function emptyDraft(barcode: string | null = null): Draft {
@@ -92,6 +100,7 @@ type Step =
   | { k: 'lookup'; code: string }
   | { k: 'missing'; code: string; unavailable: boolean }
   | { k: 'search' }
+  | { k: 'combos' }
   | { k: 'dishes'; recipes: Recipe[] | null; failed: boolean }
   | { k: 'dish'; recipe: Recipe }
   | { k: 'form'; draft: Draft; back: 'menu' | 'search' };
@@ -146,7 +155,7 @@ function ProductForm({
   const [meal, setMeal] = useState<Meal>(initialMeal);
   const [name, setName] = useState(initial.name);
   const [values, setValues] = useState(initial.values);
-  const [grams, setGrams] = useState('');
+  const [grams, setGrams] = useState(initial.amount ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [touched, setTouched] = useState(false);
@@ -293,6 +302,168 @@ function ProductForm({
   );
 }
 
+/** Продукт зі списку «Часто їмо»: натискання відкриває форму зі звичною кількістю, «+» додає одразу */
+function FrequentRow({
+  food,
+  meal,
+  date,
+  onSaved,
+  onOpen,
+}: {
+  food: FrequentFood;
+  meal: Meal;
+  date: string;
+  onSaved: () => Promise<void>;
+  onOpen: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const complete =
+    food.kcal_100 !== null && food.protein_100 !== null && food.fat_100 !== null && food.carbs_100 !== null;
+
+  async function quickAdd() {
+    if (busy || !complete) return;
+    setBusy(true);
+    setError('');
+    try {
+      await addEntry({
+        date,
+        meal,
+        name: food.name,
+        amount_g: food.last_amount_g,
+        kcal_100: food.kcal_100!,
+        protein_100: food.protein_100!,
+        fat_100: food.fat_100!,
+        carbs_100: food.carbs_100!,
+        barcode: food.barcode,
+        brand: food.brand,
+        country: food.country,
+        image_url: food.image_url,
+      });
+      await onSaved();
+    } catch (e) {
+      setError(errorText(e));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="quick-row">
+        <button type="button" className="entry food-row" onClick={onOpen}>
+          <Thumb url={food.image_url} />
+          <span className="entry-main">
+            <span className="entry-name">{food.name}</span>
+            <span className="muted small">
+              {t.quick.usual} {fmtG(food.last_amount_g)} г
+              {food.kcal_100 !== null
+                ? ` · ${fmtKcal(portion(
+                    { kcal: food.kcal_100, protein: food.protein_100 ?? 0, fat: food.fat_100 ?? 0, carbs: food.carbs_100 ?? 0 },
+                    food.last_amount_g,
+                  ).kcal)} ${t.home.kcal}`
+                : ''}
+            </span>
+          </span>
+        </button>
+        {complete && (
+          <button
+            type="button"
+            className="quick-plus"
+            disabled={busy}
+            aria-label={t.quick.quickAdd}
+            onClick={() => void quickAdd()}
+          >
+            +
+          </button>
+        )}
+      </div>
+      {error && <p className="error">{error}</p>}
+    </>
+  );
+}
+
+/** Збережені комбінації продуктів («мій звичайний сніданок») */
+function CombosStep({ meal, date, onSaved }: { meal: Meal; date: string; onSaved: () => Promise<void> }) {
+  const [list, setList] = useState<MealTemplate[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    getTemplates().then(setList).catch(() => setFailed(true));
+  }, []);
+
+  async function add(id: string) {
+    if (busy) return;
+    setBusy(id);
+    setError('');
+    try {
+      await applyTemplate({ id, date, meal });
+      await onSaved();
+    } catch (e) {
+      setError(errorText(e));
+      setBusy('');
+    }
+  }
+
+  async function remove(id: string) {
+    if (busy) return;
+    if (confirm !== id) {
+      setConfirm(id);
+      return;
+    }
+    setBusy(id);
+    setError('');
+    try {
+      await deleteTemplate(id);
+      setList((l) => (l ? l.filter((x) => x.id !== id) : l));
+      setConfirm('');
+    } catch (e) {
+      setError(errorText(e));
+    }
+    setBusy('');
+  }
+
+  if (failed) return <p className="error">{t.errors.server}</p>;
+  if (!list) return <Spinner />;
+  if (list.length === 0) return <p className="muted">{t.quick.combosEmpty}</p>;
+
+  return (
+    <>
+      {list.map((c) => {
+        const total = sum(
+          c.items.map((i) =>
+            portion({ kcal: i.kcal_100, protein: i.protein_100, fat: i.fat_100, carbs: i.carbs_100 }, i.amount_g),
+          ),
+        );
+        return (
+          <div className="combo" key={c.id}>
+            <div className="combo-head">
+              <b>{c.name}</b>
+              <span className="muted small">
+                {c.items.length} {t.quick.items} · {fmtKcal(total.kcal)} {t.home.kcal}
+              </span>
+            </div>
+            <div className="muted small combo-items">
+              {c.items.map((i) => `${i.name} ${fmtG(i.amount_g)} г`).join(', ')}
+            </div>
+            <div className="combo-actions">
+              <button type="button" className="primary" disabled={!!busy} onClick={() => void add(c.id)}>
+                {busy === c.id ? t.quick.adding : `+ ${t.quick.addCombo}`}
+              </button>
+              <button type="button" className="danger" disabled={!!busy} onClick={() => void remove(c.id)}>
+                {confirm === c.id ? t.quick.confirmRemove : t.quick.removeCombo}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+      {error && <p className="error">{error}</p>}
+    </>
+  );
+}
+
 function SearchStep({ onPick, onManual }: { onPick: (f: Food) => void; onManual: () => void }) {
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
@@ -400,10 +571,12 @@ export function AddFlow({
 }) {
   const [step, setStep] = useState<Step>({ k: 'menu' });
   const [recent, setRecent] = useState<Food[]>([]);
+  const [frequent, setFrequent] = useState<FrequentFood[]>([]);
 
   useEffect(() => {
     recentFoods().then(setRecent).catch(() => setRecent([]));
-  }, []);
+    if (!onIngredient) frequentFoods().then(setFrequent).catch(() => setFrequent([]));
+  }, [onIngredient]);
 
   // Пошук за штрихкодом
   const lookupCode = step.k === 'lookup' ? step.code : null;
@@ -460,6 +633,33 @@ export function AddFlow({
             🍲 {t.dishes.menuButton}
           </button>
         )}
+        {!onIngredient && (
+          <button type="button" className="add" onClick={() => setStep({ k: 'combos' })}>
+            ⭐ {t.quick.combos}
+          </button>
+        )}
+        {frequent.length > 0 && (
+          <>
+            <h3 className="subhead">{t.quick.frequent}</h3>
+            <p className="muted small">{t.quick.frequentHint}</p>
+            {frequent.map((f) => (
+              <FrequentRow
+                key={f.id ?? f.name}
+                food={f}
+                meal={meal}
+                date={date}
+                onSaved={onSaved}
+                onOpen={() =>
+                  setStep({
+                    k: 'form',
+                    draft: { ...draftFromFood(f), amount: String(f.last_amount_g) },
+                    back: 'menu',
+                  })
+                }
+              />
+            ))}
+          </>
+        )}
         {recent.length > 0 && (
           <>
             <h3 className="subhead">{t.scan.recent}</h3>
@@ -472,6 +672,14 @@ export function AddFlow({
             ))}
           </>
         )}
+      </Sheet>
+    );
+  }
+
+  if (step.k === 'combos') {
+    return (
+      <Sheet title={t.quick.combosTitle} onClose={onClose} onBack={toMenu}>
+        <CombosStep meal={meal} date={date} onSaved={onSaved} />
       </Sheet>
     );
   }
