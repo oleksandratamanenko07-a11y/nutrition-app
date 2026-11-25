@@ -12,6 +12,11 @@ function num(v: unknown, min: number, max: number): number | null {
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
+/** Дата не може бути пізніше ніж «завтра» за UTC (запас на часові пояси). */
+function notFuture(date: string): boolean {
+  return date <= new Date(Date.now() + 36 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 const invalid = (res: VercelResponse) => res.status(400).json({ error: 'invalid_data' });
 
 /**
@@ -56,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST') {
       const b = (req.body ?? {}) as Record<string, unknown>;
       const date = typeof b.date === 'string' && DATE_RE.test(b.date) ? b.date : null;
-      if (!date) return invalid(res);
+      if (!date || !notFuture(date)) return invalid(res);
 
       if (b.type === 'water') {
         const amount = num(b.amount_ml, -3000, 3000);
@@ -106,28 +111,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           carbs_100: round2(carbs),
         };
 
-        // Продукт зберігаємо в особисту базу (без дублікатів)
-        const { data: existing, error: findError } = await supabase
-          .from('foods')
-          .select('id')
-          .eq('owner_id', uid)
-          .eq('name', name)
-          .eq('kcal_100', values.kcal_100)
-          .eq('protein_100', values.protein_100)
-          .eq('fat_100', values.fat_100)
-          .eq('carbs_100', values.carbs_100)
-          .limit(1)
-          .maybeSingle();
-        if (findError) throw findError;
+        // Додаткові дані про продукт (зі сканера / Open Food Facts) — необов'язкові
+        const text = (v: unknown, max: number): string | null =>
+          typeof v === 'string' && v.trim() !== '' ? v.trim().slice(0, max) : null;
+        const barcode = typeof b.barcode === 'string' && /^\d{8,14}$/.test(b.barcode) ? b.barcode : null;
+        const brand = text(b.brand, 80);
+        const country = text(b.country, 80);
+        const image = typeof b.image_url === 'string' && /^https:\/\//.test(b.image_url) && b.image_url.length <= 500
+          ? b.image_url
+          : null;
+        const source = b.source === 'openfoodfacts' ? 'openfoodfacts' : 'manual';
+        const details = { barcode, brand, country, image_url: image, source };
 
-        let foodId: string | null = existing?.id ?? null;
+        // Продукт зберігаємо в особисту базу (без дублікатів).
+        // За штрихкодом шукаємо спершу: виправлення користувача оновлюють збережений продукт.
+        let existingId: string | null = null;
+        if (barcode) {
+          const { data: byCode, error: codeError } = await supabase
+            .from('foods')
+            .select('id')
+            .eq('owner_id', uid)
+            .eq('barcode', barcode)
+            .limit(1)
+            .maybeSingle();
+          if (codeError) throw codeError;
+          existingId = byCode?.id ?? null;
+        }
+        if (!existingId) {
+          const { data: byName, error: findError } = await supabase
+            .from('foods')
+            .select('id')
+            .eq('owner_id', uid)
+            .eq('name', name)
+            .eq('kcal_100', values.kcal_100)
+            .eq('protein_100', values.protein_100)
+            .eq('fat_100', values.fat_100)
+            .eq('carbs_100', values.carbs_100)
+            .limit(1)
+            .maybeSingle();
+          if (findError) throw findError;
+          existingId = byName?.id ?? null;
+        }
+
+        let foodId: string | null = existingId;
         const now = new Date().toISOString();
         if (foodId) {
-          await supabase.from('foods').update({ last_used_at: now }).eq('id', foodId).eq('owner_id', uid);
+          const patch: Record<string, unknown> = { last_used_at: now, name, ...values };
+          if (barcode) Object.assign(patch, details);
+          if (source === 'manual') delete patch.source; // не затираємо походження збереженого продукту
+          const { error: upError } = await supabase.from('foods').update(patch).eq('id', foodId).eq('owner_id', uid);
+          if (upError) throw upError;
         } else {
           const { data: food, error: foodError } = await supabase
             .from('foods')
-            .insert({ owner_id: uid, name, source: 'manual', last_used_at: now, ...values })
+            .insert({ owner_id: uid, name, last_used_at: now, ...values, ...details })
             .select('id')
             .single();
           if (foodError) throw foodError;
@@ -148,6 +185,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .select('*')
           .single();
         if (entryError) throw entryError;
+
+        // День ведення щоденника: один календарний день рахується один раз,
+        // а при видаленні записів загальна кількість днів не зменшується.
+        const { error: dayError } = await supabase
+          .from('logged_days')
+          .upsert({ owner_id: uid, day: date }, { onConflict: 'owner_id,day', ignoreDuplicates: true });
+        if (dayError) console.error('logged_days error', dayError);
+
         return res.status(200).json({ entry });
       }
 
