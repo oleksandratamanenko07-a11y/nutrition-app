@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUser } from './_lib/auth.js';
 import { db } from './_lib/supabase.js';
+import { orderedTimestamps } from './_lib/quick.js';
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -24,6 +25,7 @@ const invalid = (res: VercelResponse) => res.status(400).json({ error: 'invalid_
  *   GET    ?date=РРРР-ММ-ДД          записи дня + випита вода
  *   POST   {type:'entry', ...}       додати продукт у щоденник
  *   POST   {type:'water', ...}       додати/прибрати воду
+ *   POST   {type:'copy', from_date, date, from_meal?, to_meal?}  скопіювати день або прийом їжі
  *   PATCH  {id, amount_g?, meal?}    змінити кількість / перенести
  *   DELETE ?id=...                   видалити запис
  */
@@ -86,6 +88,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (insertError) throw insertError;
         }
         return res.status(200).json({ water_ml: total + delta });
+      }
+
+      if (b.type === 'copy') {
+        const from = typeof b.from_date === 'string' && DATE_RE.test(b.from_date) ? b.from_date : null;
+        const fromMeal = typeof b.from_meal === 'string' && MEALS.includes(b.from_meal) ? b.from_meal : null;
+        const toMeal = typeof b.to_meal === 'string' && MEALS.includes(b.to_meal) ? b.to_meal : null;
+        // або весь день (без прийомів), або конкретний прийом їжі в інший прийом
+        if (!from || (fromMeal === null) !== (toMeal === null)) return invalid(res);
+        // копіювання на самого себе дало б дублікати
+        if (from === date && (toMeal === null || toMeal === fromMeal)) return invalid(res);
+
+        let q = supabase
+          .from('diary_entries')
+          .select('*')
+          .eq('owner_id', uid)
+          .eq('entry_date', from)
+          .order('created_at', { ascending: true })
+          .limit(100);
+        if (fromMeal) q = q.eq('meal', fromMeal);
+        const { data: src, error: srcError } = await q;
+        if (srcError) throw srcError;
+        if (!src || src.length === 0) return res.status(200).json({ copied: 0 });
+
+        const stamps = orderedTimestamps(src.length);
+        const { error: copyError } = await supabase.from('diary_entries').insert(
+          src.map((r: Record<string, unknown>, idx: number) => ({
+            owner_id: uid,
+            entry_date: date,
+            meal: toMeal ?? r.meal,
+            food_id: r.food_id ?? null,
+            name: r.name,
+            amount_g: r.amount_g,
+            kcal_100: r.kcal_100,
+            protein_100: r.protein_100,
+            fat_100: r.fat_100,
+            carbs_100: r.carbs_100,
+            recipe_snapshot: r.recipe_snapshot ?? null,
+            created_at: stamps[idx],
+          })),
+        );
+        if (copyError) throw copyError;
+
+        const { error: dayError } = await supabase
+          .from('logged_days')
+          .upsert({ owner_id: uid, day: date }, { onConflict: 'owner_id,day', ignoreDuplicates: true });
+        if (dayError) console.error('logged_days error', dayError);
+        return res.status(200).json({ copied: src.length });
       }
 
       if (b.type === 'entry') {
