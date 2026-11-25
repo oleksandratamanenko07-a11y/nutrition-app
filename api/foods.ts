@@ -8,6 +8,7 @@ import {
   parseOffProduct,
   type FoodProduct,
 } from './_lib/off.js';
+import { normalizeQuery, rankByTokens, tokenize } from './_lib/search.js';
 
 const OFF_BASE = 'https://world.openfoodfacts.org';
 
@@ -102,31 +103,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ status: 'found', product });
     }
 
-    const q = one(req.query.q).trim().slice(0, 60);
-    if (q) {
+    if (typeof req.query.q === 'string') {
+      const q = normalizeQuery(req.query.q);
+      const tokens = tokenize(q);
+      // Порожній запит (або лише пробіли) нічого не шукає
+      if (tokens.length === 0) return res.status(200).json({ saved: [], off: [], off_error: false });
       if (q.length < 2) return res.status(400).json({ error: 'invalid_data' });
-      const like = `%${q.replace(/[%_\\,()]/g, ' ')}%`;
 
+      // Власні продукти: беремо продукти користувача й відбираємо за всіма словами
+      // (будь-який порядок слів, без урахування регістру та діакритики)
       const savedPromise = supabase
         .from('foods')
         .select('*')
         .eq('owner_id', uid)
-        .ilike('name', like)
         .order('last_used_at', { ascending: false, nullsFirst: false })
-        .limit(10);
+        .limit(1000);
+
+      const offSearch = async (terms: string[]): Promise<FoodProduct[]> => {
+        const url =
+          `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(terms.join(' '))}` +
+          `&search_simple=1&action=process&json=1&page_size=24&fields=${OFF_FIELDS}`;
+        const r = await offGet(url);
+        if (!r.ok) throw new Error(`off ${r.status}`);
+        const json = (await r.json()) as { products?: unknown[] };
+        return (json.products ?? [])
+          .map((p) => parseOffProduct(p))
+          .filter((p): p is FoodProduct => p !== null);
+      };
+      const offText = (p: FoodProduct) => `${p.name} ${p.brand ?? ''}`;
 
       const offPromise = (async (): Promise<{ items: FoodProduct[]; error: boolean }> => {
         try {
-          const url =
-            `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(q)}` +
-            `&search_simple=1&action=process&json=1&page_size=15&fields=${OFF_FIELDS}`;
-          const r = await offGet(url);
-          if (!r.ok) return { items: [], error: true };
-          const json = (await r.json()) as { products?: unknown[] };
-          const items = (json.products ?? [])
-            .map((p) => parseOffProduct(p))
-            .filter((p): p is FoodProduct => p !== null);
-          return { items, error: false };
+          let items = rankByTokens(await offSearch(tokens), offText, tokens, true);
+          // Якщо за всіма словами нічого немає — пробуємо найбільш конкретні слова (довші)
+          if (items.length === 0 && tokens.length > 1) {
+            const key = [...tokens].sort((a, b) => b.length - a.length).slice(0, 2);
+            items = rankByTokens(await offSearch(key), offText, tokens, false).slice(0, 15);
+          }
+          return { items: items.slice(0, 15), error: false };
         } catch {
           return { items: [], error: true };
         }
@@ -134,11 +148,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const [saved, off] = await Promise.all([savedPromise, offPromise]);
       if (saved.error) throw saved.error;
-      return res.status(200).json({
-        saved: (saved.data ?? []).map((r) => fromRow(r as FoodRow)),
-        off: off.items,
-        off_error: off.error,
-      });
+      const savedItems = rankByTokens(
+        (saved.data ?? []).map((r) => fromRow(r as FoodRow)),
+        (p: FoodProduct) => `${p.name} ${p.brand ?? ''}`,
+        tokens,
+        true,
+      ).slice(0, 10);
+      return res.status(200).json({ saved: savedItems, off: off.items, off_error: off.error });
     }
 
     if (one(req.query.recent)) {
