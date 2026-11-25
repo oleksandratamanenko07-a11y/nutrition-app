@@ -1,12 +1,25 @@
 import { t } from '../i18n/uk';
 import type { Profile } from '../lib/api';
+import { AchievementsFull } from './Achievements';
 
-export function ProfileTab({ profile, onEdit }: { profile: Profile; onEdit: () => void }) {
+export function ProfileTab({
+  profile,
+  onEdit,
+  days,
+  today,
+}: {
+  profile: Profile;
+  onEdit: () => void;
+  days: string[] | null;
+  today: string;
+}) {
   const kg = (v: number | null) =>
     v === null ? '—' : `${Number(v).toLocaleString('uk-UA')} ${t.profile.kg}`;
   return (
     <>
       <h1>{t.profile.title}</h1>
+
+      {days && <AchievementsFull days={days} today={today} />}
 
       <section className="card">
         <h2>{t.profile.data}</h2>
