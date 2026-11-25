@@ -1106,3 +1106,68 @@ button.macro-btn:active {
   background: var(--bg);
   text-align: center;
 }
+
+/* ---------- Швидке додавання ---------- */
+
+.quick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quick-row .entry {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.quick-plus {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.quick-plus:disabled {
+  opacity: 0.5;
+}
+
+.meal-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 8px;
+}
+
+.meal-tools button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 4px 0;
+}
+
+.combo {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.combo-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.combo-items {
+  margin: 6px 0 10px;
+}
+
+.combo-actions {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 8px;
+}
