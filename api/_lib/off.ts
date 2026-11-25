@@ -11,7 +11,9 @@ export interface FoodProduct {
   protein_100: number | null;
   fat_100: number | null;
   carbs_100: number | null;
-  source: 'saved' | 'openfoodfacts';
+  source: 'saved' | 'openfoodfacts' | 'usda';
+  /** Для збережених продуктів: звідки вони з’явилися (manual / openfoodfacts / usda / recipe) */
+  origin?: string | null;
   /** Калорії розраховано з кДж, бо в базі вказано лише енергію в кДж. */
   kcal_from_kj: boolean;
   /** Значення виглядають неправдоподібними — користувачу варто перевірити з упаковкою. */
