@@ -9,6 +9,7 @@ import {
   type FoodProduct,
 } from './_lib/off.js';
 import { normalizeQuery, rankByTokens, tokenize } from './_lib/search.js';
+import { aggregateFrequent, type EntryRow } from './_lib/quick.js';
 import { parseUsdaFoods, parseUsdaQuery } from './_lib/usda.js';
 
 const OFF_BASE = 'https://world.openfoodfacts.org';
@@ -63,6 +64,7 @@ async function offGet(url: string): Promise<Response> {
  * GET /api/foods?barcode=...  — продукт за штрихкодом (спершу свої, потім Open Food Facts)
  * GET /api/foods?q=...        — пошук за назвою (свої + Open Food Facts)
  * GET /api/foods?recent=1     — нещодавно використані продукти
+ * GET /api/foods?frequent=1   — продукти, які користувач додає найчастіше (з останньою кількістю)
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = getUser(req);
@@ -187,6 +189,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         off_error: off.error,
         usda_status: usda.status,
       });
+    }
+
+    if (one(req.query.frequent)) {
+      const since = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      const { data: rows, error } = await supabase
+        .from('diary_entries')
+        .select('food_id,name,meal,amount_g,kcal_100,protein_100,fat_100,carbs_100,entry_date,created_at,recipe_snapshot')
+        .eq('owner_id', uid)
+        .gte('entry_date', since)
+        .order('entry_date', { ascending: false })
+        .limit(3000);
+      if (error) throw error;
+      const top = aggregateFrequent((rows ?? []) as EntryRow[], 10, 2);
+
+      const ids = top.map((t) => t.food_id).filter((x): x is string => !!x);
+      const foods = new Map<string, FoodRow>();
+      if (ids.length > 0) {
+        const { data: fr, error: fe } = await supabase.from('foods').select('*').eq('owner_id', uid).in('id', ids);
+        if (fe) throw fe;
+        for (const f of (fr ?? []) as FoodRow[]) foods.set(f.id, f);
+      }
+      const items = top.map((t) => {
+        const row = t.food_id ? foods.get(t.food_id) : undefined;
+        const values = {
+          kcal_100: t.kcal_100,
+          protein_100: t.protein_100,
+          fat_100: t.fat_100,
+          carbs_100: t.carbs_100,
+        };
+        const base: FoodProduct = row
+          ? fromRow(row)
+          : {
+              id: null, barcode: null, name: t.name, brand: null, country: null, image_url: null,
+              ...values, source: 'saved', kcal_from_kj: false, suspicious: flagSuspicious(values),
+            };
+        return { ...base, last_amount_g: t.last_amount_g, days: t.days };
+      });
+      return res.status(200).json({ items });
     }
 
     if (one(req.query.recent)) {
