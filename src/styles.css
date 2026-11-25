@@ -834,3 +834,84 @@ input.missing-input {
   flex: 1;
   margin: 0 8px;
 }
+
+/* ---------- Власні страви ---------- */
+
+.dish-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+}
+
+.dish-photo {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 14px;
+  margin-bottom: 10px;
+}
+
+.photo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.file-btn {
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.ing {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.ing-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ing-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ing .inline input {
+  max-width: 110px;
+}
+
+.unit {
+  align-self: center;
+  color: var(--muted);
+}
+
+button.small-icon {
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+button.secondary.wide {
+  flex: none;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.tabbar button span {
+  font-size: 11px;
+}
