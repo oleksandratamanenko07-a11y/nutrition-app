@@ -120,7 +120,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const image = typeof b.image_url === 'string' && /^https:\/\//.test(b.image_url) && b.image_url.length <= 500
           ? b.image_url
           : null;
-        const source = b.source === 'openfoodfacts' ? 'openfoodfacts' : b.source === 'recipe' ? 'recipe' : 'manual';
+        const source =
+          b.source === 'openfoodfacts' ? 'openfoodfacts'
+          : b.source === 'usda' ? 'usda'
+          : b.source === 'recipe' ? 'recipe'
+          : 'manual';
         const details = { barcode, brand, country, image_url: image, source };
 
         // Продукт зберігаємо в особисту базу (без дублікатів).
