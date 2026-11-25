@@ -7,13 +7,14 @@ import { Diary } from './components/Diary';
 import { Home } from './components/Home';
 import { Onboarding } from './components/Onboarding';
 import { ProfileTab } from './components/ProfileTab';
+import { Dishes } from './components/Dishes';
 
 type State =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
   | { kind: 'ready'; profile: Profile };
 
-type Tab = 'home' | 'diary' | 'profile';
+type Tab = 'home' | 'diary' | 'dishes' | 'profile';
 
 function addDays(date: string, n: number): string {
   const [y, m, d] = date.split('-').map(Number);
@@ -88,6 +89,13 @@ function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
         </svg>
         <span>{t.nav.diary}</span>
       </button>
+      <button type="button" className={tab === 'dishes' ? 'active' : ''} onClick={() => onChange('dishes')}>
+        <svg viewBox="0 0 24 24" {...icon} aria-hidden="true">
+          <path d="M4 11h16a8 8 0 0 1-16 0z" />
+          <path d="M8 7c0-1.5 1-1.5 1-3M12 7c0-1.5 1-1.5 1-3M16 7c0-1.5 1-1.5 1-3" />
+        </svg>
+        <span>{t.nav.dishes}</span>
+      </button>
       <button type="button" className={tab === 'profile' ? 'active' : ''} onClick={() => onChange('profile')}>
         <svg viewBox="0 0 24 24" {...icon} aria-hidden="true">
           <circle cx="12" cy="8" r="4" />
@@ -146,7 +154,7 @@ function Main({ profile, onEdit }: { profile: Profile; onEdit: () => void }) {
   return (
     <div className="app">
       <main className="page">
-        {tab !== 'profile' && <DateBar date={date} today={today} onChange={setDate} />}
+        {(tab === 'home' || tab === 'diary') && <DateBar date={date} today={today} onChange={setDate} />}
 
         {banner && (
           <div className="banner">
@@ -166,7 +174,7 @@ function Main({ profile, onEdit }: { profile: Profile; onEdit: () => void }) {
           </div>
         )}
 
-        {!day && loading && tab !== 'profile' && (
+        {!day && loading && (tab === 'home' || tab === 'diary') && (
           <div className="center-block">
             <div className="spinner" aria-label={t.loading} />
           </div>
@@ -174,6 +182,7 @@ function Main({ profile, onEdit }: { profile: Profile; onEdit: () => void }) {
 
         {day && tab === 'home' && <Home profile={profile} day={day} onWater={onWater} days={days} today={today} />}
         {day && tab === 'diary' && <Diary date={date} entries={day.entries} reload={reloadAll} />}
+        {tab === 'dishes' && <Dishes today={today} onAdded={reloadAll} />}
         {tab === 'profile' && <ProfileTab profile={profile} onEdit={onEdit} days={days} today={today} />}
       </main>
       <TabBar tab={tab} onChange={setTab} />
