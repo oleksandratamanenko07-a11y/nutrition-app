@@ -9,8 +9,10 @@ import {
   type FoodProduct,
 } from './_lib/off.js';
 import { normalizeQuery, rankByTokens, tokenize } from './_lib/search.js';
+import { parseUsdaFoods, parseUsdaQuery } from './_lib/usda.js';
 
 const OFF_BASE = 'https://world.openfoodfacts.org';
+const USDA_BASE = 'https://api.nal.usda.gov/fdc/v1';
 
 interface FoodRow {
   id: string;
@@ -23,6 +25,7 @@ interface FoodRow {
   protein_100: number | string | null;
   fat_100: number | string | null;
   carbs_100: number | string | null;
+  source?: string | null;
 }
 
 const num = (v: number | string | null): number | null => (v === null ? null : Number(v));
@@ -43,6 +46,7 @@ function fromRow(r: FoodRow): FoodProduct {
     image_url: r.image_url,
     ...values,
     source: 'saved',
+    origin: r.source ?? null,
     kcal_from_kj: false,
     suspicious: flagSuspicious(values),
   };
@@ -146,7 +150,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       })();
 
-      const [saved, off] = await Promise.all([savedPromise, offPromise]);
+      // Звичайні продукти без штрихкодів: USDA FoodData Central (ключ лише на сервері)
+      const usdaPromise = (async (): Promise<{ items: FoodProduct[]; status: 'ok' | 'error' | 'no_key' | 'skipped' }> => {
+        const uq = parseUsdaQuery(q);
+        if (!uq) return { items: [], status: 'skipped' };
+        const key = process.env.USDA_API_KEY;
+        if (!key) return { items: [], status: 'no_key' };
+        try {
+          const url =
+            `${USDA_BASE}/foods/search?api_key=${encodeURIComponent(key)}` +
+            `&query=${encodeURIComponent(uq.terms.join(' '))}` +
+            `&dataType=Foundation,SR%20Legacy&pageSize=50`;
+          const r = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(7000) });
+          if (!r.ok) return { items: [], status: 'error' };
+          return { items: parseUsdaFoods(await r.json(), uq, flagSuspicious), status: 'ok' };
+        } catch {
+          return { items: [], status: 'error' };
+        }
+      })();
+
+      const [saved, off, usda] = await Promise.all([savedPromise, offPromise, usdaPromise]);
       if (saved.error) throw saved.error;
       const savedItems = rankByTokens(
         (saved.data ?? []).map((r) => fromRow(r as FoodRow)),
@@ -154,7 +177,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         tokens,
         true,
       ).slice(0, 10);
-      return res.status(200).json({ saved: savedItems, off: off.items, off_error: off.error });
+      // Не дублюємо: те, що вже є в особистій базі (та сама назва й значення), з USDA не показуємо
+      const sig = (p: FoodProduct) => [p.name, p.kcal_100, p.protein_100, p.fat_100, p.carbs_100].join('|');
+      const have = new Set(savedItems.map(sig));
+      return res.status(200).json({
+        saved: savedItems,
+        usda: usda.items.filter((p) => !have.has(sig(p))),
+        off: off.items,
+        off_error: off.error,
+        usda_status: usda.status,
+      });
     }
 
     if (one(req.query.recent)) {
