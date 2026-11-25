@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { t } from '../i18n/uk';
 import type { Day, Profile } from '../lib/api';
+import { goalStatus } from '../lib/calc';
 import { fmtG, fmtKcal, totals } from '../lib/day';
+import { AchievementsSummary } from './Achievements';
 
 function Ring({ eaten, goal }: { eaten: number; goal: number }) {
   const R = 84;
@@ -9,13 +11,14 @@ function Ring({ eaten, goal }: { eaten: number; goal: number }) {
   const ratio = goal > 0 ? Math.min(eaten / goal, 1) : 0;
   const over = goal > 0 && eaten > goal;
   const left = goal - eaten;
+  const status = goalStatus(eaten, goal);
 
   return (
-    <div className="ring">
+    <div className={`ring st-${status}`}>
       <svg viewBox="0 0 200 200" aria-hidden="true">
         <circle className="ring-bg" cx="100" cy="100" r={R} />
         <circle
-          className={over ? 'ring-fg over' : 'ring-fg'}
+          className="ring-fg"
           cx="100"
           cy="100"
           r={R}
@@ -33,28 +36,21 @@ function Ring({ eaten, goal }: { eaten: number; goal: number }) {
   );
 }
 
-function MacroBar({
-  label,
-  value,
-  goal,
-  color,
-}: {
-  label: string;
-  value: number;
-  goal: number;
-  color: string;
-}) {
+const STATUS_TEXT = { low: t.home.statusLow, ok: t.home.statusOk, high: t.home.statusHigh } as const;
+
+function MacroBar({ label, value, goal }: { label: string; value: number; goal: number }) {
   const pct = goal > 0 ? Math.min((value / goal) * 100, 100) : 0;
+  const status = goalStatus(value, goal);
   return (
-    <div className="macro">
+    <div className={`macro st-${status}`}>
       <div className="macro-head">
         <span>{label}</span>
-        <span className="muted">
+        <span className="st-text" title={STATUS_TEXT[status]}>
           {fmtG(value)} / {goal} {t.home.g}
         </span>
       </div>
       <div className="bar">
-        <div className="bar-fill" style={{ width: `${pct}%`, background: color }} />
+        <div className="bar-fill st-fill" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -64,10 +60,14 @@ export function Home({
   profile,
   day,
   onWater,
+  days,
+  today,
 }: {
   profile: Profile;
   day: Day;
   onWater: (ml: number) => Promise<void>;
+  days: string[] | null;
+  today: string;
 }) {
   const [busy, setBusy] = useState(false);
   const sum = totals(day.entries);
@@ -106,20 +106,18 @@ export function Home({
           label={t.home.protein}
           value={sum.protein}
           goal={profile.protein_goal_g ?? 0}
-          color="var(--protein)"
         />
         <MacroBar
           label={t.home.fat}
           value={sum.fat}
           goal={profile.fat_goal_g ?? 0}
-          color="var(--fat)"
         />
         <MacroBar
           label={t.home.carbs}
           value={sum.carbs}
           goal={profile.carbs_goal_g ?? 0}
-          color="var(--carbs)"
         />
+        <p className="muted small legend">{t.home.legend}</p>
       </section>
 
       <section className="card">
@@ -144,6 +142,7 @@ export function Home({
           </button>
         </div>
       </section>
+      {days && <AchievementsSummary days={days} today={today} />}
     </>
   );
 }
