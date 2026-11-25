@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from './i18n/uk';
-import { addWater, ApiError, getProfile, type Profile } from './lib/api';
+import { addWater, ApiError, getLoggedDays, getProfile, type Profile } from './lib/api';
 import { useDay } from './lib/day';
 import { initData, localDate } from './lib/telegram';
 import { Diary } from './components/Diary';
@@ -105,6 +105,31 @@ function Main({ profile, onEdit }: { profile: Profile; onEdit: () => void }) {
   const [tab, setTab] = useState<Tab>('home');
   const [flash, setFlash] = useState('');
   const { day, loading, error, reload } = useDay(date);
+  const [days, setDays] = useState<string[] | null>(null);
+  const [daysFailed, setDaysFailed] = useState(false);
+
+  const loadDays = useCallback(async () => {
+    try {
+      setDays(await getLoggedDays());
+      setDaysFailed(false);
+    } catch {
+      // медалі — другорядна функція: головний екран працює і без них, але помилку показуємо
+      setDaysFailed(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadDays();
+  }, [loadDays]);
+
+  // Після змін у щоденнику оновлюємо і дні для медалей
+  const reloadAll = useCallback(
+    async (silent = false) => {
+      await reload(silent);
+      void loadDays();
+    },
+    [reload, loadDays],
+  );
 
   async function onWater(ml: number) {
     try {
@@ -132,15 +157,24 @@ function Main({ profile, onEdit }: { profile: Profile; onEdit: () => void }) {
           </div>
         )}
 
+        {daysFailed && days === null && (
+          <div className="banner">
+            <span>{t.achievements.loadError}</span>
+            <button type="button" onClick={() => void loadDays()}>
+              {t.retry}
+            </button>
+          </div>
+        )}
+
         {!day && loading && tab !== 'profile' && (
           <div className="center-block">
             <div className="spinner" aria-label={t.loading} />
           </div>
         )}
 
-        {day && tab === 'home' && <Home profile={profile} day={day} onWater={onWater} />}
-        {day && tab === 'diary' && <Diary date={date} entries={day.entries} reload={reload} />}
-        {tab === 'profile' && <ProfileTab profile={profile} onEdit={onEdit} />}
+        {day && tab === 'home' && <Home profile={profile} day={day} onWater={onWater} days={days} today={today} />}
+        {day && tab === 'diary' && <Diary date={date} entries={day.entries} reload={reloadAll} />}
+        {tab === 'profile' && <ProfileTab profile={profile} onEdit={onEdit} days={days} today={today} />}
       </main>
       <TabBar tab={tab} onChange={setTab} />
     </div>
