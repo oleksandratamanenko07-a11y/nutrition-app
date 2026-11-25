@@ -6,6 +6,7 @@ import {
   lookupBarcode,
   recentFoods,
   searchFoods,
+  type SearchResult,
   type Food,
   type Meal,
   type Recipe,
@@ -33,7 +34,7 @@ export interface Draft {
   brand: string | null;
   country: string | null;
   image_url: string | null;
-  source: 'manual' | 'openfoodfacts';
+  source: 'manual' | 'openfoodfacts' | 'usda';
   values: Record<Nutrient, string>;
   /** Поля, яких немає в базі продуктів — показуємо «не вказано», нічого не підставляємо */
   missing: Record<Nutrient, boolean>;
@@ -72,7 +73,7 @@ export function draftFromFood(f: Food): Draft {
     brand: f.brand,
     country: f.country,
     image_url: f.image_url,
-    source: f.source === 'openfoodfacts' ? 'openfoodfacts' : 'manual',
+    source: f.source === 'openfoodfacts' ? 'openfoodfacts' : f.source === 'usda' ? 'usda' : 'manual',
     values: { kcal: str(v.kcal), protein: str(v.protein), fat: str(v.fat), carbs: str(v.carbs) },
     missing: {
       kcal: v.kcal === null,
@@ -234,7 +235,7 @@ function ProductForm({
       </label>
 
       <p className="muted small">
-        {t.diary.per100}. {initial.source === 'openfoodfacts' ? t.scan.sourceOff : t.diary.per100Hint}
+        {t.diary.per100}. {initial.source === 'openfoodfacts' ? t.scan.sourceOff : initial.source === 'usda' ? t.scan.sourceUsda : t.diary.per100Hint}
       </p>
       <div className="grid2">
         {NUTRIENTS.map((k) => {
@@ -295,7 +296,7 @@ function ProductForm({
 function SearchStep({ onPick, onManual }: { onPick: (f: Food) => void; onManual: () => void }) {
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ saved: Food[]; off: Food[]; off_error: boolean } | null>(null);
+  const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState('');
   const seq = useRef(0);
 
@@ -326,7 +327,7 @@ function SearchStep({ onPick, onManual }: { onPick: (f: Food) => void; onManual:
     return () => clearTimeout(timer);
   }, [q]);
 
-  const empty = result && result.saved.length === 0 && result.off.length === 0;
+  const empty = result && result.saved.length === 0 && result.usda.length === 0 && result.off.length === 0;
 
   return (
     <>
@@ -345,11 +346,22 @@ function SearchStep({ onPick, onManual }: { onPick: (f: Food) => void; onManual:
       {!loading && result && (
         <>
           {result.off_error && <p className="muted small">{t.scan.offError}</p>}
+          {(result.usda_status === 'error' || result.usda_status === 'no_key') && (
+            <p className="muted small">{t.scan.usdaUnavailable}</p>
+          )}
           {result.saved.length > 0 && (
             <>
               <h3 className="subhead">{t.scan.mySaved}</h3>
               {result.saved.map((f) => (
                 <FoodRow key={f.id ?? f.name} food={f} onPick={() => onPick(f)} />
+              ))}
+            </>
+          )}
+          {result.usda.length > 0 && (
+            <>
+              <h3 className="subhead">{t.scan.usdaResults}</h3>
+              {result.usda.map((f, i) => (
+                <FoodRow key={f.name + (f.brand ?? '') + i} food={f} onPick={() => onPick(f)} />
               ))}
             </>
           )}
