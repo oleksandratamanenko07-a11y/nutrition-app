@@ -972,3 +972,137 @@ button.macro-btn:active {
   font-weight: 600;
   vertical-align: middle;
 }
+
+/* ---------- Календар харчування ---------- */
+
+.back-link {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 16px;
+  padding: 4px 0;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cal-weekdays {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cal-loading {
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+
+.cal-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cal-day.has {
+  border-color: var(--st, var(--muted));
+  font-weight: 600;
+}
+
+.cal-day.st-none-logged {
+  --st: var(--muted);
+}
+
+.cal-day.is-today span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.cal-day.future {
+  opacity: 0.3;
+  border-color: transparent;
+}
+
+.cal-day:not(.future):active {
+  transform: scale(0.94);
+}
+
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cal-legend i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  border-radius: 50%;
+  border: 3px solid var(--st, var(--border));
+}
+
+.cal-legend .st-none i {
+  border-color: var(--border);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.stat {
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--bg);
+}
+
+.stat-num {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.card-inner {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--bg);
+  margin-bottom: 10px;
+}
+
+.big-num {
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.day-macros {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.day-macro {
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--bg);
+  text-align: center;
+}
