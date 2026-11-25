@@ -2,12 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/uk';
 import {
   addEntry,
+  getRecipes,
   lookupBarcode,
   recentFoods,
   searchFoods,
   type Food,
   type Meal,
+  type Recipe,
 } from '../lib/api';
+import type { Ingredient } from '../lib/recipe';
+import { DishAddForm } from './DishAdd';
 import { portion } from '../lib/calc';
 import { fmtG, fmtKcal } from '../lib/day';
 import { errorText, MealPicker, ok, parseNum, Sheet } from './ui';
@@ -22,7 +26,8 @@ const LABEL: Record<Nutrient, string> = {
   carbs: t.diary.carbs,
 };
 
-interface Draft {
+export interface Draft {
+  foodId: string | null;
   barcode: string | null;
   name: string;
   brand: string | null;
@@ -36,8 +41,9 @@ interface Draft {
   suspicious: boolean;
 }
 
-function emptyDraft(barcode: string | null = null): Draft {
+export function emptyDraft(barcode: string | null = null): Draft {
   return {
+    foodId: null,
     barcode,
     name: '',
     brand: null,
@@ -51,7 +57,7 @@ function emptyDraft(barcode: string | null = null): Draft {
   };
 }
 
-function draftFromFood(f: Food): Draft {
+export function draftFromFood(f: Food): Draft {
   const v = {
     kcal: f.kcal_100,
     protein: f.protein_100,
@@ -60,6 +66,7 @@ function draftFromFood(f: Food): Draft {
   };
   const str = (n: number | null) => (n === null ? '' : String(n));
   return {
+    foodId: f.id,
     barcode: f.barcode,
     name: f.name,
     brand: f.brand,
@@ -84,6 +91,8 @@ type Step =
   | { k: 'lookup'; code: string }
   | { k: 'missing'; code: string; unavailable: boolean }
   | { k: 'search' }
+  | { k: 'dishes'; recipes: Recipe[] | null; failed: boolean }
+  | { k: 'dish'; recipe: Recipe }
   | { k: 'form'; draft: Draft; back: 'menu' | 'search' };
 
 function Spinner() {
@@ -94,7 +103,7 @@ function Spinner() {
   );
 }
 
-function Thumb({ url }: { url: string | null }) {
+export function Thumb({ url }: { url: string | null }) {
   return url ? (
     <img className="thumb" src={url} alt="" loading="lazy" referrerPolicy="no-referrer" />
   ) : (
@@ -124,11 +133,14 @@ function ProductForm({
   meal: initialMeal,
   date,
   onSaved,
+  onIngredient,
 }: {
   draft: Draft;
   meal: Meal;
   date: string;
   onSaved: () => Promise<void>;
+  /** Якщо передано — форма додає інгредієнт до страви, а не запис у щоденник */
+  onIngredient?: (i: Ingredient) => void;
 }) {
   const [meal, setMeal] = useState<Meal>(initialMeal);
   const [name, setName] = useState(initial.name);
@@ -158,6 +170,18 @@ function ProductForm({
   async function submit() {
     setTouched(true);
     if (!valid || sumTooBig || saving) return;
+    if (onIngredient) {
+      onIngredient({
+        food_id: initial.foodId,
+        name: name.trim(),
+        amount_g: g!,
+        kcal_100: n.kcal!,
+        protein_100: n.protein!,
+        fat_100: n.fat!,
+        carbs_100: n.carbs!,
+      });
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -244,10 +268,12 @@ function ProductForm({
         <input inputMode="decimal" value={grams} onChange={(e) => setGrams(e.target.value)} />
       </label>
 
-      <label className="field">
-        <span>{t.diary.meal}</span>
-        <MealPicker value={meal} onChange={setMeal} />
-      </label>
+      {!onIngredient && (
+        <label className="field">
+          <span>{t.diary.meal}</span>
+          <MealPicker value={meal} onChange={setMeal} />
+        </label>
+      )}
 
       {preview && (
         <p className="preview">
@@ -260,7 +286,7 @@ function ProductForm({
       {error && <p className="error">{error}</p>}
 
       <button type="button" className="primary" disabled={saving} onClick={() => void submit()}>
-        {saving ? t.diary.saving : t.diary.addButton}
+        {saving ? t.diary.saving : onIngredient ? t.dishes.addToDish : t.diary.addButton}
       </button>
     </>
   );
@@ -350,11 +376,14 @@ export function AddFlow({
   date,
   onClose,
   onSaved,
+  onIngredient,
 }: {
   meal: Meal;
   date: string;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  /** Режим «інгредієнт для страви»: замість запису в щоденник повертає інгредієнт */
+  onIngredient?: (i: Ingredient) => void;
 }) {
   const [step, setStep] = useState<Step>({ k: 'menu' });
   const [recent, setRecent] = useState<Food[]>([]);
@@ -387,9 +416,17 @@ export function AddFlow({
 
   const toMenu = () => setStep({ k: 'menu' });
 
+  const openDishes = () => {
+    setStep({ k: 'dishes', recipes: null, failed: false });
+    getRecipes()
+      .then((recipes) => setStep({ k: 'dishes', recipes, failed: false }))
+      .catch(() => setStep({ k: 'dishes', recipes: null, failed: true }));
+  };
+  const menuTitle = onIngredient ? t.dishes.ingredientTitle : t.scan.menuTitle;
+
   if (step.k === 'menu') {
     return (
-      <Sheet title={t.scan.menuTitle} onClose={onClose}>
+      <Sheet title={menuTitle} onClose={onClose}>
         <button type="button" className="primary" onClick={() => setStep({ k: 'scan' })}>
           📷 {t.scan.scanButton}
         </button>
@@ -405,6 +442,11 @@ export function AddFlow({
             ✍️ {t.scan.manualButton}
           </button>
         </div>
+        {!onIngredient && (
+          <button type="button" className="add" onClick={openDishes}>
+            🍲 {t.dishes.menuButton}
+          </button>
+        )}
         {recent.length > 0 && (
           <>
             <h3 className="subhead">{t.scan.recent}</h3>
@@ -484,13 +526,39 @@ export function AddFlow({
     );
   }
 
+  if (step.k === 'dishes') {
+    return (
+      <Sheet title={t.dishes.pickTitle} onClose={onClose} onBack={toMenu}>
+        {step.failed && <p className="error">{t.dishes.loadError}</p>}
+        {!step.failed && step.recipes === null && <Spinner />}
+        {step.recipes && step.recipes.length === 0 && <p className="muted">{t.dishes.empty}</p>}
+        {step.recipes?.map((r) => (
+          <button type="button" className="entry food-row" key={r.id} onClick={() => setStep({ k: 'dish', recipe: r })}>
+            <Thumb url={r.image_data} />
+            <span className="entry-main">
+              <span className="entry-name">{r.name}</span>
+            </span>
+          </button>
+        ))}
+      </Sheet>
+    );
+  }
+
+  if (step.k === 'dish') {
+    return (
+      <Sheet title={step.recipe.name} onClose={onClose} onBack={openDishes}>
+        <DishAddForm recipe={step.recipe} meal={meal} date={date} onSaved={onSaved} />
+      </Sheet>
+    );
+  }
+
   return (
     <Sheet
-      title={t.diary.addTitle}
+      title={onIngredient ? t.dishes.ingredientTitle : t.diary.addTitle}
       onClose={onClose}
       onBack={() => setStep(step.back === 'search' ? { k: 'search' } : { k: 'menu' })}
     >
-      <ProductForm draft={step.draft} meal={meal} date={date} onSaved={onSaved} />
+      <ProductForm draft={step.draft} meal={meal} date={date} onSaved={onSaved} onIngredient={onIngredient} />
     </Sheet>
   );
 }
