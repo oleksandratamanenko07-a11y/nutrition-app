@@ -1,6 +1,8 @@
 import { t } from '../i18n/uk';
 import type { Profile } from '../lib/api';
+import { useState } from 'react';
 import { AchievementsFull } from './Achievements';
+import { Calendar } from './Calendar';
 
 export function ProfileTab({
   profile,
@@ -15,9 +17,16 @@ export function ProfileTab({
 }) {
   const kg = (v: number | null) =>
     v === null ? '—' : `${Number(v).toLocaleString('uk-UA')} ${t.profile.kg}`;
+  const [calendar, setCalendar] = useState(false);
+  if (calendar) return <Calendar today={today} onClose={() => setCalendar(false)} />;
+
   return (
     <>
       <h1>{t.profile.title}</h1>
+
+      <button type="button" className="secondary wide" onClick={() => setCalendar(true)}>
+        📅 {t.calendar.open}
+      </button>
 
       {days && <AchievementsFull days={days} today={today} />}
 
