@@ -1,5 +1,6 @@
 import { initData } from './telegram';
 import type { Activity, Goal, Sex } from './calc';
+import type { Ingredient } from './recipe';
 
 export interface Profile {
   telegram_id: number;
@@ -21,7 +22,17 @@ export interface Profile {
 
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
+export interface SnapshotItem {
+  name: string;
+  amount_g: number;
+  kcal_100: number | null;
+  protein_100: number | null;
+  fat_100: number | null;
+  carbs_100: number | null;
+}
+
 export interface Entry {
+  recipe_snapshot?: SnapshotItem[] | null;
   id: string;
   entry_date: string;
   meal: Meal;
@@ -123,7 +134,8 @@ export interface NewEntry {
   brand?: string | null;
   country?: string | null;
   image_url?: string | null;
-  source?: 'manual' | 'openfoodfacts';
+  source?: 'manual' | 'openfoodfacts' | 'recipe';
+  recipe_snapshot?: SnapshotItem[] | null;
   date: string;
   meal: Meal;
   name: string;
@@ -205,4 +217,40 @@ export function searchFoods(q: string): Promise<{ saved: Food[]; off: Food[]; of
 export async function recentFoods(): Promise<Food[]> {
   const r = await request<{ saved: Food[] }>('/api/foods?recent=1');
   return r.saved;
+}
+
+// ---------- Власні страви ----------
+
+export interface Recipe {
+  id: string;
+  name: string;
+  image_data: string | null;
+  /** Вага готової страви, якщо вказана вручну */
+  total_weight_g: number | null;
+  ingredients: Ingredient[];
+}
+
+export async function getRecipes(): Promise<Recipe[]> {
+  const r = await request<{ recipes: Recipe[] }>('/api/recipes');
+  return r.recipes;
+}
+
+export interface RecipeInput {
+  id?: string;
+  name: string;
+  /** undefined — не змінювати фото, null — прибрати */
+  image_data?: string | null;
+  total_weight_g: number | null;
+  ingredients: Ingredient[];
+}
+
+export async function saveRecipe(input: RecipeInput): Promise<void> {
+  await request<{ id: string }>('/api/recipes', {
+    method: input.id ? 'PUT' : 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteRecipe(id: string): Promise<void> {
+  await request<{ ok: boolean }>(`/api/recipes?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
