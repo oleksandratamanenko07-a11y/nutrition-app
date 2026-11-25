@@ -75,6 +75,18 @@ function EditSheet({
         {t.diary.f} {fmtG(entry.fat_100)} · {t.diary.c} {fmtG(entry.carbs_100)}
       </p>
 
+      {entry.recipe_snapshot && entry.recipe_snapshot.length > 0 && (
+        <>
+          <h3 className="subhead">{t.dishes.snapshotTitle}</h3>
+          {entry.recipe_snapshot.map((i, idx) => (
+            <div className="row" key={idx}>
+              <span>{i.name}</span>
+              <b>{fmtG(i.amount_g)} г</b>
+            </div>
+          ))}
+        </>
+      )}
+
       <label className="field">
         <span>{t.diary.grams}</span>
         <input inputMode="decimal" value={grams} onChange={(e) => setGrams(e.target.value)} />
