@@ -135,7 +135,7 @@ export interface NewEntry {
   brand?: string | null;
   country?: string | null;
   image_url?: string | null;
-  source?: 'manual' | 'openfoodfacts' | 'recipe';
+  source?: 'manual' | 'openfoodfacts' | 'usda' | 'recipe';
   recipe_snapshot?: SnapshotItem[] | null;
   date: string;
   meal: Meal;
@@ -198,7 +198,7 @@ export interface Food {
   protein_100: number | null;
   fat_100: number | null;
   carbs_100: number | null;
-  source: 'saved' | 'openfoodfacts';
+  source: 'saved' | 'openfoodfacts' | 'usda';
   kcal_from_kj: boolean;
   suspicious: boolean;
 }
@@ -211,7 +211,17 @@ export function lookupBarcode(code: string): Promise<BarcodeLookup> {
   return request<BarcodeLookup>(`/api/foods?barcode=${encodeURIComponent(code)}`);
 }
 
-export function searchFoods(q: string): Promise<{ saved: Food[]; off: Food[]; off_error: boolean }> {
+export interface SearchResult {
+  saved: Food[];
+  /** Звичайні продукти без штрихкодів (USDA FoodData Central) */
+  usda: Food[];
+  off: Food[];
+  off_error: boolean;
+  /** ok — шукали; skipped — запит не схожий на звичайний продукт; error/no_key — база недоступна */
+  usda_status: 'ok' | 'skipped' | 'error' | 'no_key';
+}
+
+export function searchFoods(q: string): Promise<SearchResult> {
   return request(`/api/foods?q=${encodeURIComponent(q)}`);
 }
 
