@@ -119,6 +119,11 @@ export async function getDay(date: string): Promise<Day> {
 }
 
 export interface NewEntry {
+  barcode?: string | null;
+  brand?: string | null;
+  country?: string | null;
+  image_url?: string | null;
+  source?: 'manual' | 'openfoodfacts';
   date: string;
   meal: Meal;
   name: string;
@@ -158,4 +163,46 @@ export async function addWater(date: string, amountMl: number): Promise<number> 
     body: JSON.stringify({ type: 'water', date, amount_ml: amountMl }),
   });
   return Number(r.water_ml);
+}
+
+// ---------- Дні ведення щоденника ----------
+
+export async function getLoggedDays(): Promise<string[]> {
+  const r = await request<{ days: string[] }>('/api/days');
+  return r.days;
+}
+
+// ---------- Продукти: штрихкод, пошук, нещодавні ----------
+
+export interface Food {
+  id: string | null;
+  barcode: string | null;
+  name: string;
+  brand: string | null;
+  country: string | null;
+  image_url: string | null;
+  kcal_100: number | null;
+  protein_100: number | null;
+  fat_100: number | null;
+  carbs_100: number | null;
+  source: 'saved' | 'openfoodfacts';
+  kcal_from_kj: boolean;
+  suspicious: boolean;
+}
+
+export type BarcodeLookup =
+  | { status: 'found'; product: Food }
+  | { status: 'not_found' | 'unavailable' };
+
+export function lookupBarcode(code: string): Promise<BarcodeLookup> {
+  return request<BarcodeLookup>(`/api/foods?barcode=${encodeURIComponent(code)}`);
+}
+
+export function searchFoods(q: string): Promise<{ saved: Food[]; off: Food[]; off_error: boolean }> {
+  return request(`/api/foods?q=${encodeURIComponent(q)}`);
+}
+
+export async function recentFoods(): Promise<Food[]> {
+  const r = await request<{ saved: Food[] }>('/api/foods?recent=1');
+  return r.saved;
 }
