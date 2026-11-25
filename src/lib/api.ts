@@ -50,7 +50,7 @@ export interface Day {
   water_ml: number;
 }
 
-export type ApiErrorKind = 'offline' | 'unauthorized' | 'invalid' | 'server';
+export type ApiErrorKind = 'offline' | 'unauthorized' | 'invalid' | 'limit' | 'server';
 
 export class ApiError extends Error {
   kind: ApiErrorKind;
@@ -75,6 +75,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   if (res.status === 401) throw new ApiError('unauthorized');
   if (res.status === 400) throw new ApiError('invalid');
+  if (res.status === 409) throw new ApiError('limit');
   if (!res.ok) throw new ApiError('server');
   return (await res.json()) as T;
 }
@@ -273,4 +274,68 @@ export async function getHistory(month: string): Promise<{ entries: Entry[]; goa
     `/api/history?month=${encodeURIComponent(month)}`,
   );
   return { entries: r.entries.map(normEntry), goals: r.goals };
+}
+
+// ---------- Швидке додавання ----------
+
+/** Скопіювати день (без from_meal/to_meal) або один прийом їжі в інший день/прийом */
+export async function copyEntries(p: {
+  date: string;
+  from_date: string;
+  from_meal?: Meal;
+  to_meal?: Meal;
+}): Promise<number> {
+  const r = await request<{ copied: number }>('/api/diary', {
+    method: 'POST',
+    body: JSON.stringify({ type: 'copy', ...p }),
+  });
+  return r.copied;
+}
+
+export interface FrequentFood extends Food {
+  /** Остання використана кількість, г */
+  last_amount_g: number;
+  /** У скількох різних днях продукт додавали */
+  days: number;
+}
+
+export async function frequentFoods(): Promise<FrequentFood[]> {
+  const r = await request<{ items: FrequentFood[] }>('/api/foods?frequent=1');
+  return r.items.map((i) => ({ ...i, last_amount_g: Number(i.last_amount_g) }));
+}
+
+export interface TemplateItem {
+  name: string;
+  amount_g: number;
+  kcal_100: number;
+  protein_100: number;
+  fat_100: number;
+  carbs_100: number;
+}
+
+export interface MealTemplate {
+  id: string;
+  name: string;
+  items: TemplateItem[];
+}
+
+export async function getTemplates(): Promise<MealTemplate[]> {
+  const r = await request<{ templates: MealTemplate[] }>('/api/templates');
+  return r.templates;
+}
+
+export async function createTemplate(p: { name: string; date: string; meal: Meal }): Promise<void> {
+  await request('/api/templates', { method: 'POST', body: JSON.stringify({ type: 'create', ...p }) });
+}
+
+export async function applyTemplate(p: { id: string; date: string; meal: Meal }): Promise<number> {
+  const r = await request<{ added: number }>('/api/templates', {
+    method: 'POST',
+    body: JSON.stringify({ type: 'apply', ...p }),
+  });
+  return r.added;
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  await request(`/api/templates?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
