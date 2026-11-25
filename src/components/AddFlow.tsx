@@ -300,7 +300,8 @@ function SearchStep({ onPick, onManual }: { onPick: (f: Food) => void; onManual:
   const seq = useRef(0);
 
   useEffect(() => {
-    const text = q.trim();
+    // зайві пробіли на початку, в кінці та між словами не впливають на пошук
+    const text = q.replace(/\s+/g, ' ').trim();
     if (text.length < 2) {
       setResult(null);
       setLoading(false);
@@ -337,7 +338,7 @@ function SearchStep({ onPick, onManual }: { onPick: (f: Food) => void; onManual:
           onChange={(e) => setQ(e.target.value)}
         />
       </label>
-      {q.trim().length > 0 && q.trim().length < 2 && <p className="muted small">{t.scan.minChars}</p>}
+      {q.trim().length === 1 && <p className="muted small">{t.scan.minChars}</p>}
       {loading && <Spinner />}
       {error && <p className="error">{error}</p>}
 
