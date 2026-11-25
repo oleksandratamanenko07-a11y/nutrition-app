@@ -1,6 +1,7 @@
 import { initData } from './telegram';
 import type { Activity, Goal, Sex } from './calc';
 import type { Ingredient } from './recipe';
+import type { GoalRow } from './history';
 
 export interface Profile {
   telegram_id: number;
@@ -253,4 +254,13 @@ export async function saveRecipe(input: RecipeInput): Promise<void> {
 
 export async function deleteRecipe(id: string): Promise<void> {
   await request<{ ok: boolean }>(`/api/recipes?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+// ---------- Історія для календаря ----------
+
+export async function getHistory(month: string): Promise<{ entries: Entry[]; goals: GoalRow[] }> {
+  const r = await request<{ entries: Entry[]; goals: GoalRow[] }>(
+    `/api/history?month=${encodeURIComponent(month)}`,
+  );
+  return { entries: r.entries.map(normEntry), goals: r.goals };
 }
