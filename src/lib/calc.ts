@@ -136,3 +136,18 @@ export function sum(items: Per100[]): Per100 {
 export function round1(x: number): number {
   return Math.round((x + Number.EPSILON) * 10) / 10;
 }
+
+export type GoalStatus = 'low' | 'ok' | 'high';
+
+/**
+ * Статус виконання денної цілі: менше 90 % — «low» (жовтий),
+ * від 90 до 110 % включно — «ok» (зелений), понад 110 % — «high» (червоний).
+ * Порівняння в цілих числах (відсотки × 100), без похибок float.
+ */
+export function goalStatus(value: number, goal: number): GoalStatus {
+  if (!(goal > 0)) return 'low';
+  const pct100 = (value * 10000) / goal; // відсоток × 100
+  if (pct100 < 9000 - 1e-9) return 'low';
+  if (pct100 > 11000 + 1e-9) return 'high';
+  return 'ok';
+}
