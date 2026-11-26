@@ -40,6 +40,7 @@ export interface SnapshotItem {
 }
 
 export interface Entry {
+  food_id?: string | null;
   recipe_snapshot?: SnapshotItem[] | null;
   id: string;
   entry_date: string;
@@ -380,4 +381,11 @@ export async function saveSettings(patch: {
     body: JSON.stringify(patch),
   });
   return r.profile;
+}
+
+export async function getRange(from: string, to: string): Promise<{ entries: Entry[]; goals: GoalRow[] }> {
+  const r = await request<{ entries: Entry[]; goals: GoalRow[] }>(
+    `/api/history?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+  );
+  return { entries: r.entries.map(normEntry), goals: r.goals };
 }
