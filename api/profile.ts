@@ -82,6 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             birth_year: birthYear,
             height_cm: height,
             weight_kg: weight,
+            goal_weight_kg: weight, // за цією вагою щойно порахована норма
             target_weight_kg: target,
             activity_level: activity,
             goal,
