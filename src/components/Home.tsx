@@ -3,7 +3,7 @@ import { t } from '../i18n/uk';
 import type { Day, Entry, Profile } from '../lib/api';
 import { goalStatus } from '../lib/calc';
 import { fmtG, fmtKcal, totals } from '../lib/day';
-import { macroBreakdown, type Macro } from '../lib/breakdown';
+import { macroBreakdown, type Breakdown } from '../lib/breakdown';
 import {
   EXTRA_KEYS,
   extraPct,
@@ -16,7 +16,7 @@ import {
 import { AchievementsSummary } from './Achievements';
 import { Sheet } from './ui';
 
-function Ring({ eaten, goal }: { eaten: number; goal: number }) {
+function Ring({ eaten, goal, onOpen }: { eaten: number; goal: number; onOpen: () => void }) {
   const R = 84;
   const C = 2 * Math.PI * R;
   const ratio = goal > 0 ? Math.min(eaten / goal, 1) : 0;
@@ -25,7 +25,7 @@ function Ring({ eaten, goal }: { eaten: number; goal: number }) {
   const status = goalStatus(eaten, goal);
 
   return (
-    <div className={`ring st-${status}`}>
+    <button type="button" className={`ring st-${status}`} onClick={onOpen} aria-label={t.home.caloriesTitle}>
       <svg viewBox="0 0 200 200" aria-hidden="true">
         <circle className="ring-bg" cx="100" cy="100" r={R} />
         <circle
@@ -43,13 +43,14 @@ function Ring({ eaten, goal }: { eaten: number; goal: number }) {
         <div className="ring-value">{fmtKcal(Math.abs(left))}</div>
         <div className="ring-unit">{t.home.kcal}</div>
       </div>
-    </div>
+    </button>
   );
 }
 
 const STATUS_TEXT = { low: t.home.statusLow, ok: t.home.statusOk, high: t.home.statusHigh } as const;
 
-const MACRO_LABEL: Record<Macro, string> = {
+const MACRO_LABEL: Record<Breakdown, string> = {
+  kcal: t.home.caloriesTitle,
   protein: t.home.protein,
   fat: t.home.fat,
   carbs: t.home.carbs,
@@ -93,12 +94,15 @@ function MacroSheet({
   goal,
   onClose,
 }: {
-  macro: Macro;
+  macro: Breakdown;
   entries: Entry[];
   goal: number;
   onClose: () => void;
 }) {
   const { rows, total } = macroBreakdown(entries, macro);
+  const isKcal = macro === 'kcal';
+  const fmtV = isKcal ? fmtKcal : fmtG;
+  const unit = isKcal ? t.home.kcal : t.home.g;
   const status = goalStatus(total, goal);
   const pct = goal > 0 ? Math.min((total / goal) * 100, 100) : 0;
   return (
@@ -107,7 +111,7 @@ function MacroSheet({
         <div className="macro-head">
           <span className="muted">{t.home.eaten}</span>
           <span className="st-text">
-            {fmtG(total)} / {goal} {t.home.g}
+            {fmtV(total)} / {fmtV(goal)} {unit}
           </span>
         </div>
         <div className="bar">
@@ -130,7 +134,7 @@ function MacroSheet({
               </span>
             </span>
             <b>
-              {fmtG(r.value)} {t.home.g}
+              {fmtV(r.value)} {unit}
             </b>
           </div>
         ))}
@@ -138,7 +142,7 @@ function MacroSheet({
           <div className="macro-row macro-total">
             <span>{t.home.macroTotal}</span>
             <b>
-              {fmtG(total)} {t.home.g}
+              {fmtV(total)} {unit}
             </b>
           </div>
         )}
@@ -256,7 +260,7 @@ export function Home({
   today: string;
 }) {
   const [busy, setBusy] = useState(false);
-  const [openMacro, setOpenMacro] = useState<Macro | null>(null);
+  const [openMacro, setOpenMacro] = useState<Breakdown | null>(null);
   const [openExtra, setOpenExtra] = useState<ExtraKey | null>(null);
   const sum = totals(day.entries);
   const kcalGoal = profile.kcal_goal ?? 0;
@@ -276,7 +280,7 @@ export function Home({
   return (
     <>
       <section className="card center-card">
-        <Ring eaten={sum.kcal} goal={kcalGoal} />
+        <Ring eaten={sum.kcal} goal={kcalGoal} onOpen={() => setOpenMacro('kcal')} />
         <div className="kcal-row">
           <div>
             <div className="kcal-num">{fmtKcal(sum.kcal)}</div>
@@ -343,7 +347,7 @@ export function Home({
         <MacroSheet
           macro={openMacro}
           entries={day.entries}
-          goal={profile[`${openMacro}_goal_g`] ?? 0}
+          goal={openMacro === 'kcal' ? kcalGoal : profile[`${openMacro}_goal_g`] ?? 0}
           onClose={() => setOpenMacro(null)}
         />
       )}
