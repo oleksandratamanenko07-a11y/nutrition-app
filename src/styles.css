@@ -1447,3 +1447,102 @@ button.ring {
   font: inherit;
   cursor: pointer;
 }
+
+/* ---------- Згортання блоку «Клітковина, цукор і сіль» ---------- */
+
+.extras-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.extras-chev {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--muted);
+  transition: transform 0.25s ease;
+}
+
+.extras-card.open .extras-chev {
+  transform: rotate(90deg);
+}
+
+.extras-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease;
+}
+
+.extras-card.open .extras-body {
+  grid-template-rows: 1fr;
+}
+
+.extras-inner {
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden; /* у згорнутому стані елементи недоступні для фокуса */
+  transition: visibility 0s linear 0.25s;
+}
+
+.extras-card.open .extras-inner {
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.extras-inner > :first-child {
+  margin-top: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .extras-body,
+  .extras-chev,
+  .extras-inner {
+    transition: none;
+  }
+}
+
+/* ---------- Коментар до страви ---------- */
+
+.note-block {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--bg);
+  border-left: 3px solid var(--accent);
+}
+
+.note-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.note-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
