@@ -15,6 +15,10 @@ export const WEIGHT_TO_HOUR = 12;
 export const DORMANT_DAYS = 14;
 /** Якщо вагу вже вносили за останні N днів — недільне нагадування не потрібне */
 export const WEIGHT_RECENT_DAYS = 2;
+/** Аналітика харчування: щодня з 09:00 до 12:59 перевіряємо, чи пройшло 3 дні від попередньої */
+export const REVIEW_FROM_HOUR = 9;
+export const REVIEW_TO_HOUR = 12;
+export const REVIEW_CYCLE = 3;
 
 export const MESSAGES = {
   diary:
@@ -74,12 +78,18 @@ export interface DueInput {
   weightOn: boolean;
   lastDiary: string | null;
   lastWeight: string | null;
+  reviewOn?: boolean;
+  /** Дата останньої надісланої аналітики */
+  lastReview?: string | null;
+  /** Дата, коли востаннє перевіряли, чи є що аналізувати (щоб не робити запити щогодини) */
+  lastReviewCheck?: string | null;
 }
 
 export interface Due {
   date: string;
   diary: boolean;
   weight: boolean;
+  review: boolean;
 }
 
 /** Етап 1 — лише за часом і налаштуваннями (без запитів до бази). null — нічого не потрібно. */
@@ -94,7 +104,13 @@ export function dueByTime(i: DueInput): Due | null {
     p.hour >= WEIGHT_FROM_HOUR &&
     p.hour <= WEIGHT_TO_HOUR &&
     i.lastWeight !== p.date;
-  return diary || weight ? { date: p.date, diary, weight } : null;
+  const review =
+    !!i.reviewOn &&
+    p.hour >= REVIEW_FROM_HOUR &&
+    p.hour <= REVIEW_TO_HOUR &&
+    (i.lastReviewCheck ?? null) !== p.date &&
+    (!i.lastReview || p.date >= addDaysStr(i.lastReview, REVIEW_CYCLE));
+  return diary || weight || review ? { date: p.date, diary, weight, review } : null;
 }
 
 export interface Facts {
