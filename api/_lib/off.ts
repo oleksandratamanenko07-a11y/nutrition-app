@@ -11,6 +11,10 @@ export interface FoodProduct {
   protein_100: number | null;
   fat_100: number | null;
   carbs_100: number | null;
+  /** Додатково, на 100 г; null — «не вказано» */
+  fiber_100: number | null;
+  sugar_100: number | null;
+  salt_100: number | null;
   source: 'saved' | 'openfoodfacts' | 'usda';
   /** Для збережених продуктів: звідки вони з’явилися (manual / openfoodfacts / usda / recipe) */
   origin?: string | null;
@@ -36,6 +40,17 @@ function firstText(...vals: unknown[]): string | null {
     if (typeof v === 'string' && v.trim() !== '') return v.trim();
   }
   return null;
+}
+
+/** Додаткові показники на 100 г. Сіль, якщо її немає, — з натрію (сіль = натрій × 2,5). */
+export function parseExtrasOff(n: Record<string, unknown>): { fiber_100: number | null; sugar_100: number | null; salt_100: number | null } {
+  const cap = (v: number | null) => (v !== null && v <= 100 ? v : null);
+  let salt = numOrNull(n['salt_100g']);
+  if (salt === null) {
+    const sodium = numOrNull(n['sodium_100g']);
+    if (sodium !== null) salt = Math.round(sodium * 2.5 * 100) / 100;
+  }
+  return { fiber_100: cap(numOrNull(n['fiber_100g'])), sugar_100: cap(numOrNull(n['sugars_100g'])), salt_100: cap(salt) };
 }
 
 export function flagSuspicious(p: {
@@ -91,6 +106,7 @@ export function parseOffProduct(raw: unknown, fallbackCode: string | null = null
     country,
     image_url: image && /^https:\/\//.test(image) ? image : null,
     ...values,
+    ...parseExtrasOff(n),
     source: 'openfoodfacts',
     kcal_from_kj: fromKj,
     suspicious: flagSuspicious(values),
