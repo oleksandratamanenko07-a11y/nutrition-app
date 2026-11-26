@@ -4,6 +4,7 @@ import { db } from './_lib/supabase.js';
 import { parseExtras, type Extras } from './_lib/extras.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CATEGORIES = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
 const IMG_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/;
 
 interface IngredientIn {
@@ -59,7 +60,18 @@ function parseBody(b: Record<string, unknown>) {
       extras: parseExtras(raw),
     });
   }
-  return { name, image, weight, ingredients };
+  let category: string | null = null;
+  if (b.category !== undefined && b.category !== null && b.category !== '') {
+    if (typeof b.category !== 'string' || !CATEGORIES.includes(b.category)) return null;
+    category = b.category;
+  }
+  // is_public: не передали — undefined (не чіпаємо при зміні, true для нової страви)
+  let isPublic: boolean | undefined;
+  if (b.is_public !== undefined) {
+    if (typeof b.is_public !== 'boolean') return null;
+    isPublic = b.is_public;
+  }
+  return { name, image, weight, ingredients, category, isPublic };
 }
 
 /**
@@ -80,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET') {
       const { data: recipes, error } = await supabase
         .from('recipes')
-        .select('id,name,image_data,total_weight_g,created_at')
+        .select('id,name,image_data,total_weight_g,is_public,category,created_at')
         .eq('owner_id', uid)
         .order('created_at', { ascending: false })
         .limit(200);
@@ -103,6 +115,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           name: r.name,
           image_data: r.image_data ?? null,
           total_weight_g: num2(r.total_weight_g),
+          is_public: r.is_public !== false,
+          category: r.category ?? null,
           ingredients: ings
             .filter((i) => i.recipe_id === r.id)
             .map((i) => ({
@@ -151,7 +165,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (req.method === 'POST') {
         const { data: rec, error } = await supabase
           .from('recipes')
-          .insert({ owner_id: uid, name: p.name, image_data: p.image, total_weight_g: p.weight })
+          .insert({
+            owner_id: uid, name: p.name, image_data: p.image, total_weight_g: p.weight,
+            category: p.category, is_public: p.isPublic ?? true,
+          })
           .select('id')
           .single();
         if (error) throw error;
@@ -182,8 +199,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (de) throw de;
       }
       const patch: Record<string, unknown> = {
-        name: p.name, total_weight_g: p.weight, updated_at: new Date().toISOString(),
+        name: p.name, total_weight_g: p.weight, category: p.category, updated_at: new Date().toISOString(),
       };
+      if (p.isPublic !== undefined) patch.is_public = p.isPublic;
       // image_data: передали значення — оновлюємо (null = прибрати фото); не передали — не чіпаємо
       if (body.image_data !== undefined) patch.image_data = p.image;
       const { error: ue } = await supabase.from('recipes').update(patch).eq('id', id).eq('owner_id', uid);
