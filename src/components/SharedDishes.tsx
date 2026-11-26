@@ -5,6 +5,7 @@ import { fmtKcal } from '../lib/day';
 import { dishPer100, dishTotals, fmt1 } from '../lib/recipe';
 import { Thumb } from './AddFlow';
 import { CategoryChips } from './CategoryChips';
+import { NoteBlock } from './NoteBlock';
 import { errorText, Sheet } from './ui';
 
 function SharedDetail({
@@ -57,6 +58,8 @@ function SharedDetail({
         )}
       </div>
       {tot.missing.length > 0 && <p className="error small">{t.dishes.incomplete}</p>}
+
+      <NoteBlock title={t.dishes.authorNote} text={recipe.note} />
 
       <h3 className="subhead">{t.dishes.composition}</h3>
       {recipe.ingredients.map((i, idx) => (
