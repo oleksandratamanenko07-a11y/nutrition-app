@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUser } from './_lib/auth.js';
 import { db } from './_lib/supabase.js';
+import { parseExtras, type Extras } from './_lib/extras.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const IMG_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/;
@@ -13,6 +14,7 @@ interface IngredientIn {
   protein_100: number;
   fat_100: number;
   carbs_100: number;
+  extras: Extras;
 }
 
 function num(v: unknown, min: number, max: number): number | null {
@@ -54,6 +56,7 @@ function parseBody(b: Record<string, unknown>) {
     ingredients.push({
       food_id: fid, name: iname, amount_g: r2(grams),
       kcal_100: r2(kcal), protein_100: r2(protein), fat_100: r2(fat), carbs_100: r2(carbs),
+      extras: parseExtras(raw),
     });
   }
   return { name, image, weight, ingredients };
@@ -87,7 +90,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (ids.length) {
         const { data, error: ie } = await supabase
           .from('recipe_ingredients')
-          .select('recipe_id,food_id,name,amount_g,kcal_100,protein_100,fat_100,carbs_100,position')
+          .select('recipe_id,food_id,name,amount_g,kcal_100,protein_100,fat_100,carbs_100,fiber_100,sugar_100,salt_100,position')
           .in('recipe_id', ids)
           .order('position', { ascending: true });
         if (ie) throw ie;
@@ -110,6 +113,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               protein_100: num2(i.protein_100),
               fat_100: num2(i.fat_100),
               carbs_100: num2(i.carbs_100),
+              fiber_100: num2(i.fiber_100),
+              sugar_100: num2(i.sugar_100),
+              salt_100: num2(i.salt_100),
             })),
         })),
       });
@@ -138,6 +144,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           protein_100: i.protein_100,
           fat_100: i.fat_100,
           carbs_100: i.carbs_100,
+          ...i.extras,
           position: idx,
         }));
 
