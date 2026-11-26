@@ -5,7 +5,7 @@ import { validTz } from './_lib/reminders.js';
 
 /**
  * Налаштування нагадувань і часовий пояс.
- *   PUT {remind_diary?: boolean, remind_weight?: boolean, tz?: string}  → {profile}
+ *   PUT {remind_diary?: boolean, remind_weight?: boolean, remind_review?: boolean, tz?: string}  → {profile}
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = getUser(req);
@@ -25,6 +25,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (b.remind_weight !== undefined) {
       if (typeof b.remind_weight !== 'boolean') return res.status(400).json({ error: 'invalid_data' });
       patch.remind_weight = b.remind_weight;
+    }
+    if (b.remind_review !== undefined) {
+      if (typeof b.remind_review !== 'boolean') return res.status(400).json({ error: 'invalid_data' });
+      patch.remind_review = b.remind_review;
     }
     if (b.tz !== undefined) {
       if (!validTz(b.tz)) return res.status(400).json({ error: 'invalid_data' });
