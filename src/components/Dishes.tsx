@@ -37,6 +37,8 @@ interface Row {
   name: string;
   grams: string;
   vals: Record<Nutrient, string>;
+  /** Клітковина, цукор, сіль інгредієнта — тут не редагуються, але зберігаються */
+  extras: Pick<Ingredient, 'fiber_100' | 'sugar_100' | 'salt_100'>;
   open: boolean;
 }
 
@@ -53,6 +55,7 @@ function rowFrom(i: Ingredient): Row {
       fat: str(i.fat_100),
       carbs: str(i.carbs_100),
     },
+    extras: { fiber_100: i.fiber_100 ?? null, sugar_100: i.sugar_100 ?? null, salt_100: i.salt_100 ?? null },
     open: false,
   };
 }
@@ -74,6 +77,7 @@ function ingredientOf(r: Row): { ing: Ingredient; gramsOk: boolean } {
       protein_100: v('protein'),
       fat_100: v('fat'),
       carbs_100: v('carbs'),
+      ...r.extras,
     },
   };
 }
