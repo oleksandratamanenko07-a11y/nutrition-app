@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       let query = supabase
         .from('recipes')
-        .select('id,name,image_data,total_weight_g,category,copies_count,created_at')
+        .select('id,name,image_data,total_weight_g,category,copies_count,note,created_at')
         .eq('is_public', true)
         .neq('owner_id', user.id);
       const cat = one(req.query.category);
@@ -64,6 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           image_data: r.image_data ?? null,
           total_weight_g: num(r.total_weight_g),
           category: normCategory(r.category),
+          note: r.note ?? null,
           copies_count: Number(r.copies_count ?? 0),
           created_at: r.created_at,
           ingredients: ings
@@ -104,7 +105,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Копіювати можна лише опубліковану страву іншого користувача
       const { data: src, error: se } = await supabase
         .from('recipes')
-        .select('id,name,image_data,total_weight_g,category')
+        .select('id,name,image_data,total_weight_g,category,note')
         .eq('id', id).eq('is_public', true).neq('owner_id', user.id)
         .maybeSingle();
       if (se) throw se;
@@ -129,6 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .insert({
           owner_id: user.id, name: src.name, image_data: src.image_data, total_weight_g: src.total_weight_g,
           category: src.category, is_public: false, source_id: id, saved_from: id,
+          note: null, source_note: src.note ?? null, // власний коментар порожній, коментар оригіналу — знімок
         })
         .select('id')
         .single();
