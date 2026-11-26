@@ -5,6 +5,7 @@ import { portion } from '../lib/calc';
 import { entryPortion, fmtG, fmtKcal, totals } from '../lib/day';
 import { AddFlow } from './AddFlow';
 import { localDate } from '../lib/telegram';
+import { EXTRA_KEYS, EXTRA_FIELD, extraValue } from '../lib/extras';
 import { errorText, MEALS, MealPicker, ok, parseNum, Sheet } from './ui';
 
 function EditSheet({
@@ -74,6 +75,28 @@ function EditSheet({
       <p className="muted small">
         {t.diary.per100}: {fmtKcal(entry.kcal_100)} {t.home.kcal} · {t.diary.p} {fmtG(entry.protein_100)} ·{' '}
         {t.diary.f} {fmtG(entry.fat_100)} · {t.diary.c} {fmtG(entry.carbs_100)}
+      </p>
+
+      <p className="muted small">
+        {EXTRA_KEYS.map((k, i) => {
+          const per = entry[EXTRA_FIELD[k]];
+          return (
+            <span key={k}>
+              {i > 0 ? ' · ' : ''}
+              {t.extras[k]} {per === null || per === undefined ? t.extras.notSpecified : `${fmtG(per)} ${t.home.g}`}
+            </span>
+          );
+        })}
+        {validGrams && g !== null && EXTRA_KEYS.some((k) => extraValue({ ...entry, amount_g: g }, k) !== null) && (
+          <>
+            <br />
+            {t.extras.perPortion}:{' '}
+            {EXTRA_KEYS.map((k) => {
+              const v = extraValue({ ...entry, amount_g: g }, k);
+              return `${t.extras[k]} ${v === null ? t.extras.notSpecified : `${fmtG(v)} ${t.home.g}`}`;
+            }).join(' · ')}
+          </>
+        )}
       </p>
 
       {entry.recipe_snapshot && entry.recipe_snapshot.length > 0 && (
