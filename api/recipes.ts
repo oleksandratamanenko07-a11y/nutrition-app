@@ -71,8 +71,16 @@ function parseBody(b: Record<string, unknown>) {
     if (typeof b.is_public !== 'boolean') return null;
     isPublic = b.is_public;
   }
+  // Коментар: не передали — undefined (не чіпаємо при зміні); порожній або null — прибрати
+  let note: string | null | undefined;
+  if (b.note !== undefined) {
+    if (b.note !== null && typeof b.note !== 'string') return null;
+    const nt = typeof b.note === 'string' ? b.note.replace(/\r\n/g, '\n').trim() : '';
+    if (nt.length > 500) return null;
+    note = nt === '' ? null : nt;
+  }
   const sourceId = typeof b.source_id === 'string' && UUID_RE.test(b.source_id) ? b.source_id : null;
-  return { name, image, weight, ingredients, category, isPublic, sourceId };
+  return { name, image, weight, ingredients, category, isPublic, sourceId, note };
 }
 
 /**
@@ -93,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET') {
       const { data: recipes, error } = await supabase
         .from('recipes')
-        .select('id,name,image_data,total_weight_g,is_public,category,created_at')
+        .select('id,name,image_data,total_weight_g,is_public,category,note,source_note,created_at')
         .eq('owner_id', uid)
         .order('created_at', { ascending: false })
         .limit(200);
@@ -118,6 +126,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           total_weight_g: num2(r.total_weight_g),
           is_public: r.is_public !== false,
           category: normCategory(r.category),
+          note: r.note ?? null,
+          source_note: r.source_note ?? null,
           ingredients: ings
             .filter((i) => i.recipe_id === r.id)
             .map((i) => ({
@@ -166,16 +176,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (req.method === 'POST') {
         // Звідки скопійовано: лише якщо оригінал публічний (інакше посилання ігноруємо)
         let sourceId: string | null = null;
+        let sourceNote: string | null = null;
         if (p.sourceId) {
           const { data: s } = await supabase
-            .from('recipes').select('id').eq('id', p.sourceId).eq('is_public', true).maybeSingle();
+            .from('recipes').select('id,note').eq('id', p.sourceId).eq('is_public', true).maybeSingle();
           sourceId = s?.id ?? null;
+          sourceNote = s?.note ?? null; // знімок коментаря оригіналу бере сервер, а не клієнт
         }
         const { data: rec, error } = await supabase
           .from('recipes')
           .insert({
             owner_id: uid, name: p.name, image_data: p.image, total_weight_g: p.weight,
             category: p.category, is_public: p.isPublic ?? true, source_id: sourceId,
+            note: p.note ?? null, source_note: sourceNote,
           })
           .select('id')
           .single();
@@ -211,6 +224,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         name: p.name, total_weight_g: p.weight, category: p.category, updated_at: new Date().toISOString(),
       };
       if (p.isPublic !== undefined) patch.is_public = p.isPublic;
+      if (p.note !== undefined) patch.note = p.note;
       // image_data: передали значення — оновлюємо (null = прибрати фото); не передали — не чіпаємо
       if (body.image_data !== undefined) patch.image_data = p.image;
       const { error: ue } = await supabase.from('recipes').update(patch).eq('id', id).eq('owner_id', uid);
