@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from './i18n/uk';
-import { addWater, ApiError, getLoggedDays, getProfile, type Profile } from './lib/api';
+import { addWater, ApiError, getLoggedDays, getProfile, saveSettings, type Profile } from './lib/api';
 import { useDay } from './lib/day';
-import { initData, localDate } from './lib/telegram';
+import { initData, localDate, timeZone } from './lib/telegram';
 import { Diary } from './components/Diary';
 import { Home } from './components/Home';
 import { Onboarding } from './components/Onboarding';
@@ -107,7 +107,15 @@ function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
   );
 }
 
-function Main({ profile, onEdit }: { profile: Profile; onEdit: () => void }) {
+function Main({
+  profile,
+  onEdit,
+  onProfile,
+}: {
+  profile: Profile;
+  onEdit: () => void;
+  onProfile: (p: Profile) => void;
+}) {
   const today = localDate();
   const [date, setDate] = useState(today);
   const [tab, setTab] = useState<Tab>('home');
@@ -129,6 +137,15 @@ function Main({ profile, onEdit }: { profile: Profile; onEdit: () => void }) {
   useEffect(() => {
     void loadDays();
   }, [loadDays]);
+
+  // Часовий пояс потрібен серверу, щоб нагадування приходили в правильний час
+  const tz = timeZone();
+  const savedTz = profile.tz ?? null;
+  useEffect(() => {
+    if (!tz || tz === savedTz) return;
+    saveSettings({ tz }).then(onProfile).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tz]);
 
   // Після змін у щоденнику оновлюємо і дні для медалей
   const reloadAll = useCallback(
@@ -183,7 +200,7 @@ function Main({ profile, onEdit }: { profile: Profile; onEdit: () => void }) {
         {day && tab === 'home' && <Home profile={profile} day={day} onWater={onWater} days={days} today={today} />}
         {day && tab === 'diary' && <Diary date={date} entries={day.entries} reload={reloadAll} />}
         {tab === 'dishes' && <Dishes today={today} onAdded={reloadAll} />}
-        {tab === 'profile' && <ProfileTab profile={profile} onEdit={onEdit} days={days} today={today} />}
+        {tab === 'profile' && <ProfileTab profile={profile} onEdit={onEdit} onProfile={onProfile} days={days} today={today} />}
       </main>
       <TabBar tab={tab} onChange={setTab} />
     </div>
@@ -251,5 +268,11 @@ export default function App() {
     );
   }
 
-  return <Main profile={profile} onEdit={() => setEditing(true)} />;
+  return (
+    <Main
+      profile={profile}
+      onEdit={() => setEditing(true)}
+      onProfile={(p) => setState({ kind: 'ready', profile: p })}
+    />
+  );
 }
