@@ -2,6 +2,7 @@ import { initData } from './telegram';
 import type { Activity, Goal, Sex } from './calc';
 import type { Ingredient } from './recipe';
 import type { GoalRow } from './history';
+import type { WeightLog } from './weight';
 
 export interface Profile {
   telegram_id: number;
@@ -19,6 +20,11 @@ export interface Profile {
   carbs_goal_g: number | null;
   water_goal_ml: number | null;
   onboarded: boolean;
+  /** Вага, за якою востаннє рахували норму */
+  goal_weight_kg?: number | null;
+  tz?: string | null;
+  remind_diary?: boolean;
+  remind_weight?: boolean;
 }
 
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -338,4 +344,38 @@ export async function applyTemplate(p: { id: string; date: string; meal: Meal })
 
 export async function deleteTemplate(id: string): Promise<void> {
   await request(`/api/templates?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+// ---------- Вага та нагадування ----------
+
+export async function getWeightLogs(): Promise<WeightLog[]> {
+  const r = await request<{ logs: WeightLog[] }>('/api/weight');
+  return r.logs.map((l) => ({ log_date: l.log_date, weight_kg: Number(l.weight_kg) }));
+}
+
+export async function logWeight(date: string, weightKg: number): Promise<Profile> {
+  const r = await request<{ profile: Profile }>('/api/weight', {
+    method: 'POST',
+    body: JSON.stringify({ date, weight_kg: weightKg }),
+  });
+  return r.profile;
+}
+
+export async function deleteWeight(date: string): Promise<Profile> {
+  const r = await request<{ profile: Profile }>(`/api/weight?date=${encodeURIComponent(date)}`, {
+    method: 'DELETE',
+  });
+  return r.profile;
+}
+
+export async function saveSettings(patch: {
+  remind_diary?: boolean;
+  remind_weight?: boolean;
+  tz?: string;
+}): Promise<Profile> {
+  const r = await request<{ profile: Profile }>('/api/settings', {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  });
+  return r.profile;
 }
