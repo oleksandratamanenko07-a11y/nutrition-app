@@ -3,6 +3,13 @@
  * Файл без імпортів — перевіряється окремо (scripts/selftest.mjs).
  */
 
+/** Те саме, що extras.cleanExtra (файл без імпортів): число 0–100, інакше null */
+const ex = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === '') return null;
+  const x = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+  return Number.isFinite(x) && x >= 0 && x <= 100 ? Math.round(x * 100) / 100 : null;
+};
+
 export interface EntryRow {
   food_id?: string | null;
   name: string;
@@ -12,6 +19,9 @@ export interface EntryRow {
   protein_100: number | string;
   fat_100: number | string;
   carbs_100: number | string;
+  fiber_100?: number | string | null;
+  sugar_100?: number | string | null;
+  salt_100?: number | string | null;
   entry_date: string;
   created_at?: string | null;
   recipe_snapshot?: unknown;
@@ -29,6 +39,9 @@ export interface FrequentItem {
   protein_100: number;
   fat_100: number;
   carbs_100: number;
+  fiber_100: number | null;
+  sugar_100: number | null;
+  salt_100: number | null;
 }
 
 const n = (v: number | string): number => Number(v);
@@ -66,6 +79,9 @@ export function aggregateFrequent(rows: EntryRow[], limit = 10, minDays = 2): Fr
           protein_100: n(r.protein_100),
           fat_100: n(r.fat_100),
           carbs_100: n(r.carbs_100),
+          fiber_100: ex(r.fiber_100),
+          sugar_100: ex(r.sugar_100),
+          salt_100: ex(r.salt_100),
         },
       };
       groups.set(key, g);
@@ -88,6 +104,9 @@ export interface TemplateItem {
   protein_100: number;
   fat_100: number;
   carbs_100: number;
+  fiber_100: number | null;
+  sugar_100: number | null;
+  salt_100: number | null;
   food_id: string | null;
   recipe_snapshot: unknown[] | null;
 }
@@ -103,6 +122,9 @@ export function toTemplateItems(rows: EntryRow[]): TemplateItem[] {
     protein_100: n(r.protein_100),
     fat_100: n(r.fat_100),
     carbs_100: n(r.carbs_100),
+    fiber_100: ex(r.fiber_100),
+    sugar_100: ex(r.sugar_100),
+    salt_100: ex(r.salt_100),
     food_id: r.food_id ?? null,
     recipe_snapshot: Array.isArray(r.recipe_snapshot) && r.recipe_snapshot.length > 0 ? r.recipe_snapshot : null,
   }));
@@ -133,6 +155,9 @@ export function cleanTemplateItems(raw: unknown): TemplateItem[] | null {
       protein_100: x.protein_100,
       fat_100: x.fat_100,
       carbs_100: x.carbs_100,
+      fiber_100: ex(x.fiber_100),
+      sugar_100: ex(x.sugar_100),
+      salt_100: ex(x.salt_100),
       food_id: typeof x.food_id === 'string' && UUID_RE.test(x.food_id) ? x.food_id : null,
       recipe_snapshot: Array.isArray(x.recipe_snapshot) && x.recipe_snapshot.length <= 30 ? x.recipe_snapshot : null,
     });
