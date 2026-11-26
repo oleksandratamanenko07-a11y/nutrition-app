@@ -42,6 +42,8 @@ export interface Draft {
   image_url: string | null;
   source: 'manual' | 'openfoodfacts' | 'usda';
   values: Record<Nutrient, string>;
+  /** Клітковина, цукор, сіль на 100 г; порожній рядок — «не вказано» */
+  extras: { fiber: string; sugar: string; salt: string };
   /** Поля, яких немає в базі продуктів — показуємо «не вказано», нічого не підставляємо */
   missing: Record<Nutrient, boolean>;
   fromKj: boolean;
@@ -60,6 +62,7 @@ export function emptyDraft(barcode: string | null = null): Draft {
     image_url: null,
     source: 'manual',
     values: { kcal: '', protein: '', fat: '', carbs: '' },
+    extras: { fiber: '', sugar: '', salt: '' },
     missing: { kcal: false, protein: false, fat: false, carbs: false },
     fromKj: false,
     suspicious: false,
@@ -83,6 +86,7 @@ export function draftFromFood(f: Food): Draft {
     image_url: f.image_url,
     source: f.source === 'openfoodfacts' ? 'openfoodfacts' : f.source === 'usda' ? 'usda' : 'manual',
     values: { kcal: str(v.kcal), protein: str(v.protein), fat: str(v.fat), carbs: str(v.carbs) },
+    extras: { fiber: str(f.fiber_100 ?? null), sugar: str(f.sugar_100 ?? null), salt: str(f.salt_100 ?? null) },
     missing: {
       kcal: v.kcal === null,
       protein: v.protein === null,
@@ -155,6 +159,7 @@ function ProductForm({
   const [meal, setMeal] = useState<Meal>(initialMeal);
   const [name, setName] = useState(initial.name);
   const [values, setValues] = useState(initial.values);
+  const [extras, setExtras] = useState(initial.extras);
   const [grams, setGrams] = useState(initial.amount ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -167,8 +172,16 @@ function ProductForm({
     carbs: parseNum(values.carbs),
   };
   const g = parseNum(grams);
+  // клітковина, цукор, сіль: порожнє поле = «не вказано» (null), а не нуль
+  const extraNum = (s: string): number | null | undefined => {
+    if (s.trim() === '') return null;
+    const x = parseNum(s);
+    return ok(x, 0, 100) ? x : undefined; // undefined — некоректне значення
+  };
+  const ex = { fiber: extraNum(extras.fiber), sugar: extraNum(extras.sugar), salt: extraNum(extras.salt) };
+  const extrasValid = ex.fiber !== undefined && ex.sugar !== undefined && ex.salt !== undefined;
   const valid =
-    name.trim() !== '' && ok(n.kcal, 0, 900) && ok(n.protein, 0, 100) && ok(n.fat, 0, 100) &&
+    extrasValid && name.trim() !== '' && ok(n.kcal, 0, 900) && ok(n.protein, 0, 100) && ok(n.fat, 0, 100) &&
     ok(n.carbs, 0, 100) && ok(g, 0.01, 5000);
   const sumTooBig = ok(n.protein, 0, 100) && ok(n.fat, 0, 100) && ok(n.carbs, 0, 100) &&
     n.protein + n.fat + n.carbs > 105;
@@ -189,6 +202,9 @@ function ProductForm({
         protein_100: n.protein!,
         fat_100: n.fat!,
         carbs_100: n.carbs!,
+        fiber_100: ex.fiber ?? null,
+        sugar_100: ex.sugar ?? null,
+        salt_100: ex.salt ?? null,
       });
       return;
     }
@@ -209,6 +225,9 @@ function ProductForm({
         country: initial.country,
         image_url: initial.image_url,
         source: initial.source,
+        fiber_100: ex.fiber ?? null,
+        sugar_100: ex.sugar ?? null,
+        salt_100: ex.salt ?? null,
       });
       await onSaved();
     } catch (e) {
@@ -272,6 +291,25 @@ function ProductForm({
       )}
       {initial.fromKj && <p className="muted small">{t.scan.fromKj}</p>}
       {initial.suspicious && <p className="error small">{t.scan.suspicious}</p>}
+
+      <details className="extras-form" open={Object.values(initial.extras).some((v) => v !== '')}>
+        <summary>{t.extras.formSummary}</summary>
+        <div className="grid3">
+          {(['fiber', 'sugar', 'salt'] as const).map((k) => (
+            <label className="field" key={k}>
+              <span>{t.extras[k]}</span>
+              <input
+                inputMode="decimal"
+                placeholder={t.extras.notSpecified}
+                value={extras[k]}
+                onChange={(e) => setExtras({ ...extras, [k]: e.target.value })}
+              />
+            </label>
+          ))}
+        </div>
+        <p className="muted small">{t.extras.formHint}</p>
+        {!extrasValid && <p className="error small">{t.extras.invalid}</p>}
+      </details>
 
       <label className="field">
         <span>{t.diary.grams}</span>
@@ -339,6 +377,9 @@ function FrequentRow({
         brand: food.brand,
         country: food.country,
         image_url: food.image_url,
+        fiber_100: food.fiber_100 ?? null,
+        sugar_100: food.sugar_100 ?? null,
+        salt_100: food.salt_100 ?? null,
       });
       await onSaved();
     } catch (e) {
