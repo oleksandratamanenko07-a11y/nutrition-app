@@ -18,6 +18,7 @@ import { aggregateFrequent, cleanTemplateItems, orderedTimestamps, toTemplateIte
 import { descriptionStates, parseUsdaFoods, parseUsdaQuery, stateFit } from '../api/_lib/usda.ts';
 import { goalForDate, monthGrid, summarizeMonth } from '../src/lib/history.ts';
 import { dishTotals, dishPer100, weightIsPlausible, dishExtrasPer100 } from '../src/lib/recipe.ts';
+import { CATEGORIES, normCategory } from '../api/_lib/library.ts';
 import { cleanExtra, knownExtras, parseExtras } from '../api/_lib/extras.ts';
 import { parseExtrasOff } from '../api/_lib/off.ts';
 import { extraPct, extrasBreakdown, extrasTotal, extraZone, referenceFor } from '../src/lib/extras.ts';
@@ -699,5 +700,21 @@ assert.equal(dishExtrasPer100([ing(100, 2, 1, 1), ing(100, 4, 1, 1)], 100).fiber
 const qrow = { name: 'a', amount_g: 100, kcal_100: 1, protein_100: 1, fat_100: 1, carbs_100: 1, fiber_100: '2.5', sugar_100: null, entry_date: '2026-01-01' };
 assert.deepEqual(toTemplateItems([qrow]).map((i) => [i.fiber_100, i.sugar_100, i.salt_100])[0], [2.5, null, null]);
 assert.equal(cleanTemplateItems([{ ...toTemplateItems([qrow])[0], fiber_100: 500 }])[0].fiber_100, null);
+
+// ---------- категорії страв і розбивка калорій ----------
+assert.deepEqual([...CATEGORIES], ['breakfast', 'soup', 'main', 'drink', 'bakery', 'snack', 'dessert']);
+assert.equal(normCategory('soup'), 'soup');
+assert.equal(normCategory('lunch'), null, 'стара категорія → без категорії');
+assert.equal(normCategory('dinner'), null);
+assert.equal(normCategory(null), null);
+assert.equal(normCategory(undefined), null);
+{
+  const mk = (id, kcal_100, amount_g) => ({ id, name: id, meal: 'lunch', amount_g, kcal_100, protein_100: 1, fat_100: 1, carbs_100: 1, recipe_snapshot: null });
+  const es = [mk('a', 100, 150), mk('b', 400, 100), mk('c', 52, 200)];
+  const r = macroBreakdown(es, 'kcal');
+  assert.deepEqual(r.rows.map((x) => x.id), ['b', 'a', 'c'], 'від більшого до меншого');
+  assert.equal(r.total, 150 + 400 + 104);
+  assert.equal(r.total, sum(es.map((e) => portion({ kcal: e.kcal_100, protein: e.protein_100, fat: e.fat_100, carbs: e.carbs_100 }, e.amount_g))).kcal, 'збігається з підсумком головної');
+}
 
 console.log('OK: усі перевірки пройдені');
