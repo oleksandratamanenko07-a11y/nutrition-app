@@ -348,6 +348,14 @@ export function parseUsdaFoods(
       carbs_100: nutrientValue(list, [1005, 1050], ['205', '205.2'], 'G'),
     };
     if (Object.values(values).every((v) => v === null)) return;
+    // Додатково: клітковина, цукор і сіль (сіль = натрій × 2,5; натрій у USDA — у мг)
+    const cap = (v: number | null) => (v !== null && v <= 100 ? v : null);
+    const sodiumMg = nutrientValue(list, [1093], ['307'], 'MG');
+    const extras = {
+      fiber_100: cap(nutrientValue(list, [1079], ['291'], 'G')),
+      sugar_100: cap(nutrientValue(list, [2000, 1063], ['269', '269.3'], 'G')),
+      salt_100: sodiumMg !== null ? cap(Math.round(((sodiumMg * 2.5) / 1000) * 100) / 100) : null,
+    };
 
     const states = descriptionStates(desc);
     const fit = stateFit(q.want, states);
@@ -371,6 +379,7 @@ export function parseUsdaFoods(
         country: null,
         image_url: null,
         ...values,
+        ...extras,
         source: 'usda',
         kcal_from_kj: false,
         suspicious: flag(values),
