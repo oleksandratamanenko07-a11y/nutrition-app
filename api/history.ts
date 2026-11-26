@@ -3,7 +3,7 @@ import { getUser } from './_lib/auth.js';
 import { db } from './_lib/supabase.js';
 
 /**
- * GET /api/history?month=РРРР-ММ
+ * GET /api/history?month=РРРР-ММ  або  ?from=РРРР-ММ-ДД&to=РРРР-ММ-ДД (до 93 днів)
  * Записи щоденника за місяць і вся історія денних цілей користувача.
  * Підсумки рахує клієнт тими самими функціями, що й головна, — окремої системи підрахунку немає.
  */
@@ -15,11 +15,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'method_not_allowed' });
   }
 
+  let first: string;
+  let last: string;
   const month = typeof req.query.month === 'string' ? req.query.month : '';
-  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return res.status(400).json({ error: 'invalid_data' });
-  const [y, m] = month.split('-').map(Number);
-  const first = `${month}-01`;
-  const last = `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
+  if (month) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return res.status(400).json({ error: 'invalid_data' });
+    const [y, m] = month.split('-').map(Number);
+    first = `${month}-01`;
+    last = `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
+  } else {
+    // довільний інтервал (статистика): не більше 93 днів
+    const from = typeof req.query.from === 'string' ? req.query.from : '';
+    const to = typeof req.query.to === 'string' ? req.query.to : '';
+    const ok = /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from <= to;
+    const span = ok ? (Date.parse(to) - Date.parse(from)) / 86400000 : 0;
+    if (!ok || Number.isNaN(span) || span > 92) return res.status(400).json({ error: 'invalid_data' });
+    first = from;
+    last = to;
+  }
 
   try {
     const supabase = db();
