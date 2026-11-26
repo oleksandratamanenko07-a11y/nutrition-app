@@ -4,6 +4,7 @@ import { copyShared, getShared, type SharedRecipe } from '../lib/api';
 import { fmtKcal } from '../lib/day';
 import { dishPer100, dishTotals, fmt1 } from '../lib/recipe';
 import { Thumb } from './AddFlow';
+import { CategoryChips } from './CategoryChips';
 import { errorText, Sheet } from './ui';
 
 function SharedDetail({
@@ -88,15 +89,16 @@ export function SharedDishes({
   const [items, setItems] = useState<SharedRecipe[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [q, setQ] = useState('');
+  const [cat, setCat] = useState('');
   const [error, setError] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
   const [open, setOpen] = useState<SharedRecipe | null>(null);
   const seq = useRef(0);
 
-  const load = useCallback(async (query: string) => {
+  const load = useCallback(async (query: string, category: string) => {
     const my = ++seq.current;
     try {
-      const r = await getShared(query, 0);
+      const r = await getShared(query, 0, category);
       if (my !== seq.current) return; // застарілу відповідь ігноруємо
       setItems(r.items);
       setHasMore(r.has_more);
@@ -108,15 +110,15 @@ export function SharedDishes({
 
   // Пошук із невеликою затримкою, щоб не слати запит на кожну літеру
   useEffect(() => {
-    const id = setTimeout(() => void load(q), q ? 350 : 0);
+    const id = setTimeout(() => void load(q, cat), q ? 350 : 0);
     return () => clearTimeout(id);
-  }, [q, load]);
+  }, [q, cat, load]);
 
   async function more() {
     if (!items || loadingMore) return;
     setLoadingMore(true);
     try {
-      const r = await getShared(q, items.length);
+      const r = await getShared(q, items.length, cat);
       setItems((cur) => {
         const have = new Set((cur ?? []).map((x) => x.id));
         return [...(cur ?? []), ...r.items.filter((x) => !have.has(x.id))];
@@ -134,11 +136,12 @@ export function SharedDishes({
       <label className="field">
         <input type="search" value={q} maxLength={60} placeholder={t.dishes.search} onChange={(e) => setQ(e.target.value)} />
       </label>
+      <CategoryChips value={cat} onChange={setCat} />
 
       {error && (
         <div className="banner">
           <span>{error}</span>
-          <button type="button" onClick={() => void load(q)}>
+          <button type="button" onClick={() => void load(q, cat)}>
             {t.retry}
           </button>
         </div>
@@ -148,7 +151,7 @@ export function SharedDishes({
           <div className="spinner" aria-label={t.loading} />
         </div>
       )}
-      {items && items.length === 0 && <p className="muted">{q.trim() ? t.dishes.sharedNone : t.dishes.sharedEmpty}</p>}
+      {items && items.length === 0 && <p className="muted">{q.trim() || cat ? t.dishes.sharedNone : t.dishes.sharedEmpty}</p>}
 
       {items?.map((r) => {
         const tot = dishTotals(r.ingredients, r.total_weight_g);
