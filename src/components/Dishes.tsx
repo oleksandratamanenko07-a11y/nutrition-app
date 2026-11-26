@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '../i18n/uk';
-import { CATEGORIES, deleteRecipe, getRecipes, saveRecipe, type Category, type Meal, type Recipe } from '../lib/api';
+import { CATEGORIES, deleteRecipe, getRecipes, normCategory, saveRecipe, type Category, type Meal, type Recipe } from '../lib/api';
 import { fmtKcal } from '../lib/day';
 import { photoToDataUrl } from '../lib/image';
 import {
@@ -15,6 +15,7 @@ import {
 import { AddFlow, Thumb } from './AddFlow';
 import { DishAddForm } from './DishAdd';
 import { SharedDishes } from './SharedDishes';
+import { CategoryChips } from './CategoryChips';
 import { errorText, ok, parseNum, Sheet } from './ui';
 
 const NAME: Record<Nutrient, string> = {
@@ -102,7 +103,7 @@ function DishEditor({
   const [imageChanged, setImageChanged] = useState(false);
   const isCopy = !!copyOf;
   const [isPublic, setIsPublic] = useState(isCopy ? false : recipe ? recipe.is_public !== false : true); // нові страви публічні за замовчуванням
-  const [category, setCategory] = useState<Category | ''>(recipe?.category ?? '');
+  const [category, setCategory] = useState<Category | ''>(normCategory(recipe?.category) ?? '');
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -442,6 +443,8 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'mine' | 'shared'>('mine');
+  const [q, setQ] = useState('');
+  const [cat, setCat] = useState('');
   const [view, setView] = useState<
     { k: 'none' } | { k: 'detail'; r: Recipe } | { k: 'edit'; r: Recipe | null; copy?: { sourceId: string | null } }
   >({ k: 'none' });
@@ -458,6 +461,15 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Пошук за всіма словами (без урахування регістру) і фільтр за категорією
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = (recipes ?? []).filter((r) => {
+    const c = normCategory(r.category);
+    if (cat === 'none' ? c !== null : cat !== '' && c !== cat) return false;
+    const name = r.name.toLowerCase();
+    return words.every((w) => name.includes(w));
+  });
 
   return (
     <>
@@ -500,8 +512,17 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
         </div>
       )}
       {recipes && recipes.length === 0 && <p className="muted">{t.dishes.empty}</p>}
+      {recipes && recipes.length > 0 && (
+        <>
+          <label className="field">
+            <input type="search" value={q} maxLength={60} placeholder={t.dishes.search} onChange={(e) => setQ(e.target.value)} />
+          </label>
+          <CategoryChips value={cat} onChange={setCat} />
+          {shown.length === 0 && <p className="muted">{t.dishes.sharedNone}</p>}
+        </>
+      )}
 
-      {recipes?.map((r) => {
+      {shown.map((r) => {
         const tot = dishTotals(r.ingredients, r.total_weight_g);
         return (
           <button type="button" className="card dish-card" key={r.id} onClick={() => setView({ k: 'detail', r })}>
