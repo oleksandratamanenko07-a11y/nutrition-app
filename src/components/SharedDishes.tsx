@@ -1,12 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/uk';
-import { getShared, type SharedRecipe } from '../lib/api';
+import { copyShared, getShared, type SharedRecipe } from '../lib/api';
 import { fmtKcal } from '../lib/day';
 import { dishPer100, dishTotals, fmt1 } from '../lib/recipe';
 import { Thumb } from './AddFlow';
 import { errorText, Sheet } from './ui';
 
-function SharedDetail({ recipe, onClose }: { recipe: SharedRecipe; onClose: () => void }) {
+function SharedDetail({
+  recipe,
+  onClose,
+  onCopyEdit,
+  onAdded,
+}: {
+  recipe: SharedRecipe;
+  onClose: () => void;
+  onCopyEdit: (r: SharedRecipe) => void;
+  onAdded: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [note, setNote] = useState('');
+
+  async function addToMine() {
+    if (busy) return; // захист від повторних натискань
+    setBusy(true);
+    setError('');
+    try {
+      const r = await copyShared(recipe.id);
+      setNote(r.already ? t.dishes.alreadyMine : t.dishes.addedToMine);
+      await onAdded();
+    } catch (e) {
+      setError(errorText(e));
+      setBusy(false);
+    }
+  }
   const tot = dishTotals(recipe.ingredients, recipe.total_weight_g);
   const per100 = dishPer100(tot);
   return (
@@ -37,13 +64,27 @@ function SharedDetail({ recipe, onClose }: { recipe: SharedRecipe; onClose: () =
           <b>{fmt1(i.amount_g)} г</b>
         </div>
       ))}
+      {error && <p className="error">{error}</p>}
+      {note && <p className="muted small">{note}</p>}
+      <button type="button" className="primary" style={{ marginTop: 14 }} disabled={busy} onClick={() => void addToMine()}>
+        {t.dishes.addToMine}
+      </button>
+      <button type="button" className="secondary wide" disabled={busy} onClick={() => onCopyEdit(recipe)}>
+        {t.dishes.copyEdit}
+      </button>
       <p className="muted small">{t.dishes.sharedNote}</p>
     </Sheet>
   );
 }
 
 /** Загальна бібліотека: страви інших користувачів (лише перегляд і пошук; автор анонімний) */
-export function SharedDishes() {
+export function SharedDishes({
+  onCopyEdit,
+  onAdded,
+}: {
+  onCopyEdit: (r: SharedRecipe) => void;
+  onAdded: () => Promise<void>;
+}) {
   const [items, setItems] = useState<SharedRecipe[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [q, setQ] = useState('');
@@ -131,7 +172,17 @@ export function SharedDishes() {
         </button>
       )}
 
-      {open && <SharedDetail recipe={open} onClose={() => setOpen(null)} />}
+      {open && (
+        <SharedDetail
+          recipe={open}
+          onClose={() => setOpen(null)}
+          onCopyEdit={(r) => {
+            setOpen(null);
+            onCopyEdit(r);
+          }}
+          onAdded={onAdded}
+        />
+      )}
     </>
   );
 }
