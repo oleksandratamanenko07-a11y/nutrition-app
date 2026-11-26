@@ -85,10 +85,13 @@ function ingredientOf(r: Row): { ing: Ingredient; gramsOk: boolean } {
 
 function DishEditor({
   recipe,
+  copyOf,
   onClose,
   onSaved,
 }: {
   recipe: Recipe | null;
+  /** Нова страва-копія: recipe — зразок, copyOf — id публічного оригіналу (або null для власної) */
+  copyOf?: { sourceId: string | null } | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -97,7 +100,8 @@ function DishEditor({
   const [weight, setWeight] = useState(recipe?.total_weight_g ? String(recipe.total_weight_g) : '');
   const [image, setImage] = useState<string | null>(recipe?.image_data ?? null);
   const [imageChanged, setImageChanged] = useState(false);
-  const [isPublic, setIsPublic] = useState(recipe ? recipe.is_public !== false : true); // нові страви публічні за замовчуванням
+  const isCopy = !!copyOf;
+  const [isPublic, setIsPublic] = useState(isCopy ? false : recipe ? recipe.is_public !== false : true); // нові страви публічні за замовчуванням
   const [category, setCategory] = useState<Category | ''>(recipe?.category ?? '');
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -137,9 +141,10 @@ function DishEditor({
     setError('');
     try {
       await saveRecipe({
-        id: recipe?.id,
+        id: isCopy ? undefined : recipe?.id,
+        ...(isCopy ? { source_id: copyOf?.sourceId ?? null } : {}),
         name: name.trim(),
-        ...(imageChanged || !recipe ? { image_data: image } : {}),
+        ...(imageChanged || !recipe || isCopy ? { image_data: image } : {}),
         total_weight_g: w,
         is_public: isPublic,
         category: category || null,
@@ -154,7 +159,8 @@ function DishEditor({
 
   return (
     <>
-      <Sheet title={recipe ? t.dishes.editTitle : t.dishes.createTitle} onClose={onClose}>
+      <Sheet title={isCopy ? t.dishes.copyTitle : recipe ? t.dishes.editTitle : t.dishes.createTitle} onClose={onClose}>
+        {isCopy && <p className="muted small">{t.dishes.copyHint}</p>}
         <label className="field">
           <span>{t.dishes.name}</span>
           <input
@@ -339,6 +345,7 @@ function DishDetail({
   today,
   onClose,
   onEdit,
+  onCopy,
   onChanged,
   onAdded,
 }: {
@@ -346,6 +353,7 @@ function DishDetail({
   today: string;
   onClose: () => void;
   onEdit: () => void;
+  onCopy: () => void;
   onChanged: () => Promise<void>;
   onAdded: () => Promise<void>;
 }) {
@@ -410,6 +418,9 @@ function DishDetail({
       <button type="button" className="secondary wide" onClick={onEdit}>
         {t.dishes.edit}
       </button>
+      <button type="button" className="secondary wide" onClick={onCopy}>
+        {t.dishes.copyEdit}
+      </button>
       <button type="button" className="danger" disabled={busy} onClick={() => void remove()}>
         {confirm ? t.dishes.confirmDelete : t.dishes.delete}
       </button>
@@ -432,7 +443,7 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'mine' | 'shared'>('mine');
   const [view, setView] = useState<
-    { k: 'none' } | { k: 'detail'; r: Recipe } | { k: 'edit'; r: Recipe | null }
+    { k: 'none' } | { k: 'detail'; r: Recipe } | { k: 'edit'; r: Recipe | null; copy?: { sourceId: string | null } }
   >({ k: 'none' });
 
   const load = useCallback(async () => {
@@ -460,7 +471,15 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
           {t.dishes.shared}
         </button>
       </div>
-      {tab === 'shared' && <SharedDishes />}
+      {tab === 'shared' && (
+        <SharedDishes
+          onCopyEdit={(r) => setView({ k: 'edit', r, copy: { sourceId: r.id } })}
+          onAdded={async () => {
+            setTab('mine');
+            await load();
+          }}
+        />
+      )}
       {tab === 'mine' && <>
 
       <button type="button" className="primary" style={{ margin: '8px 0 12px' }} onClick={() => setView({ k: 'edit', r: null })}>
@@ -510,6 +529,7 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
           today={today}
           onClose={() => setView({ k: 'none' })}
           onEdit={() => setView({ k: 'edit', r: view.r })}
+          onCopy={() => setView({ k: 'edit', r: { ...view.r, name: `${view.r.name} (копія)` }, copy: { sourceId: null } })}
           onChanged={async () => {
             setView({ k: 'none' });
             await load();
@@ -520,6 +540,7 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
       {view.k === 'edit' && (
         <DishEditor
           recipe={view.r}
+          copyOf={view.copy ?? null}
           onClose={() => setView({ k: 'none' })}
           onSaved={async () => {
             setView({ k: 'none' });
