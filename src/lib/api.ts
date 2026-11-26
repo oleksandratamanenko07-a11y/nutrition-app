@@ -25,6 +25,7 @@ export interface Profile {
   tz?: string | null;
   remind_diary?: boolean;
   remind_weight?: boolean;
+  remind_review?: boolean;
 }
 
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -371,6 +372,7 @@ export async function deleteWeight(date: string): Promise<Profile> {
 export async function saveSettings(patch: {
   remind_diary?: boolean;
   remind_weight?: boolean;
+  remind_review?: boolean;
   tz?: string;
 }): Promise<Profile> {
   const r = await request<{ profile: Profile }>('/api/settings', {
