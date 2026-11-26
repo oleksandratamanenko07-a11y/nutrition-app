@@ -11,6 +11,7 @@ import {
 import { normalizeQuery, rankByTokens, tokenize } from './_lib/search.js';
 import { aggregateFrequent, type EntryRow } from './_lib/quick.js';
 import { parseUsdaFoods, parseUsdaQuery } from './_lib/usda.js';
+import { parseExtras } from './_lib/extras.js';
 
 const OFF_BASE = 'https://world.openfoodfacts.org';
 const USDA_BASE = 'https://api.nal.usda.gov/fdc/v1';
@@ -26,6 +27,9 @@ interface FoodRow {
   protein_100: number | string | null;
   fat_100: number | string | null;
   carbs_100: number | string | null;
+  fiber_100?: number | string | null;
+  sugar_100?: number | string | null;
+  salt_100?: number | string | null;
   source?: string | null;
 }
 
@@ -46,6 +50,7 @@ function fromRow(r: FoodRow): FoodProduct {
     country: r.country,
     image_url: r.image_url,
     ...values,
+    ...parseExtras(r),
     source: 'saved',
     origin: r.source ?? null,
     kcal_from_kj: false,
@@ -195,7 +200,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const since = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 10);
       const { data: rows, error } = await supabase
         .from('diary_entries')
-        .select('food_id,name,meal,amount_g,kcal_100,protein_100,fat_100,carbs_100,entry_date,created_at,recipe_snapshot')
+        .select('food_id,name,meal,amount_g,kcal_100,protein_100,fat_100,carbs_100,fiber_100,sugar_100,salt_100,entry_date,created_at,recipe_snapshot')
         .eq('owner_id', uid)
         .gte('entry_date', since)
         .order('entry_date', { ascending: false })
@@ -222,7 +227,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ? fromRow(row)
           : {
               id: null, barcode: null, name: t.name, brand: null, country: null, image_url: null,
-              ...values, source: 'saved', kcal_from_kj: false, suspicious: flagSuspicious(values),
+              ...values, fiber_100: t.fiber_100, sugar_100: t.sugar_100, salt_100: t.salt_100,
+              source: 'saved', kcal_from_kj: false, suspicious: flagSuspicious(values),
             };
         return { ...base, last_amount_g: t.last_amount_g, days: t.days };
       });
