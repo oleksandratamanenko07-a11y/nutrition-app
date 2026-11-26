@@ -267,8 +267,12 @@ export interface Recipe {
   ingredients: Ingredient[];
 }
 
-export type Category = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'dessert';
-export const CATEGORIES: Category[] = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
+export type Category = 'breakfast' | 'soup' | 'main' | 'drink' | 'bakery' | 'snack' | 'dessert';
+export const CATEGORIES: Category[] = ['breakfast', 'soup', 'main', 'drink', 'bakery', 'snack', 'dessert'];
+
+/** Невідома (стара) категорія → null, тобто «Без категорії» */
+export const normCategory = (c: unknown): Category | null =>
+  typeof c === 'string' && (CATEGORIES as string[]).includes(c) ? (c as Category) : null;
 
 export async function getRecipes(): Promise<Recipe[]> {
   const r = await request<{ recipes: Recipe[] }>('/api/recipes');
@@ -301,8 +305,9 @@ export interface SharedRecipe extends Recipe {
   created_at: string;
 }
 
-export async function getShared(q: string, offset: number): Promise<{ items: SharedRecipe[]; has_more: boolean }> {
-  return request(`/api/shared?q=${encodeURIComponent(q)}&offset=${offset}`);
+/** category: ключ категорії, 'none' — без категорії, '' — усі */
+export async function getShared(q: string, offset: number, category = ''): Promise<{ items: SharedRecipe[]; has_more: boolean }> {
+  return request(`/api/shared?q=${encodeURIComponent(q)}&offset=${offset}&category=${encodeURIComponent(category)}`);
 }
 
 /** Додати чужу страву до своїх (незалежна копія). already — копія вже була, дубль не створено */
