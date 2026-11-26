@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/uk';
-import { copyShared, getShared, type SharedRecipe } from '../lib/api';
+import { copyShared, getShared, type Meal, type SharedRecipe } from '../lib/api';
 import { fmtKcal } from '../lib/day';
 import { dishPer100, dishTotals, fmt1 } from '../lib/recipe';
 import { Thumb } from './AddFlow';
 import { CategoryChips } from './CategoryChips';
+import { DishAddForm } from './DishAdd';
 import { NoteBlock } from './NoteBlock';
 import { errorText, Sheet } from './ui';
 
@@ -13,12 +14,19 @@ function SharedDetail({
   onClose,
   onCopyEdit,
   onAdded,
+  today,
+  meal,
+  onDiaryAdded,
 }: {
   recipe: SharedRecipe;
   onClose: () => void;
   onCopyEdit: (r: SharedRecipe) => void;
   onAdded: () => Promise<void>;
+  today: string;
+  meal: Meal;
+  onDiaryAdded: () => Promise<void>;
 }) {
+  const [toDiary, setToDiary] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
@@ -38,6 +46,24 @@ function SharedDetail({
   }
   const tot = dishTotals(recipe.ingredients, recipe.total_weight_g);
   const per100 = dishPer100(tot);
+  // Запис у щоденник: склад і КБЖУ копіюються в запис на момент додавання; у «Мої страви» страва не потрапляє
+  if (toDiary) {
+    return (
+      <Sheet title={recipe.name} onClose={onClose} onBack={() => setToDiary(false)}>
+        <DishAddForm
+          recipe={recipe}
+          meal={meal}
+          date={today}
+          onSaved={async () => {
+            await onDiaryAdded();
+            onClose();
+          }}
+        />
+        <p className="muted small">{t.dishes.diaryOnlyNote}</p>
+      </Sheet>
+    );
+  }
+
   return (
     <Sheet title={recipe.name} onClose={onClose}>
       {recipe.image_data && <img className="dish-photo" src={recipe.image_data} alt="" />}
@@ -70,7 +96,10 @@ function SharedDetail({
       ))}
       {error && <p className="error">{error}</p>}
       {note && <p className="muted small">{note}</p>}
-      <button type="button" className="primary" style={{ marginTop: 14 }} disabled={busy} onClick={() => void addToMine()}>
+      <button type="button" className="primary" style={{ marginTop: 14 }} disabled={busy} onClick={() => setToDiary(true)}>
+        {t.dishes.addToDiary}
+      </button>
+      <button type="button" className="secondary wide" disabled={busy} onClick={() => void addToMine()}>
         {t.dishes.addToMine}
       </button>
       <button type="button" className="secondary wide" disabled={busy} onClick={() => onCopyEdit(recipe)}>
@@ -85,9 +114,15 @@ function SharedDetail({
 export function SharedDishes({
   onCopyEdit,
   onAdded,
+  today,
+  meal,
+  onDiaryAdded,
 }: {
   onCopyEdit: (r: SharedRecipe) => void;
   onAdded: () => Promise<void>;
+  today: string;
+  meal: Meal;
+  onDiaryAdded: () => Promise<void>;
 }) {
   const [items, setItems] = useState<SharedRecipe[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -187,6 +222,9 @@ export function SharedDishes({
             onCopyEdit(r);
           }}
           onAdded={onAdded}
+          today={today}
+          meal={meal}
+          onDiaryAdded={onDiaryAdded}
         />
       )}
     </>
