@@ -159,11 +159,17 @@ function refText(k: ExtraKey, amount: number): string {
 
 /** Окремий від КБЖУ блок: клітковина, цукор, сіль. Дані необов'язкові, тому завжди видно, для скількох записів вони відомі. */
 function ExtrasCard({ entries, kcalGoal, onOpen }: { entries: Entry[]; kcalGoal: number | null; onOpen: (k: ExtraKey) => void }) {
+  const [open, setOpen] = useState(false); // завжди згорнуто при відкритті головної
   if (entries.length === 0) return null;
   const partialTotal = extrasTotal(entries, 'fiber');
   return (
-    <section className="card extras-card">
-      <h2>{t.extras.title}</h2>
+    <section className={`card extras-card ${open ? 'open' : ''}`}>
+      <button type="button" className="extras-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span>{t.extras.title}</span>
+        <span className="extras-chev" aria-hidden="true">›</span>
+      </button>
+      <div className="extras-body">
+        <div className="extras-inner">
       {EXTRA_KEYS.map((k) => {
         const tot = extrasTotal(entries, k);
         const ref = referenceFor(k, kcalGoal);
@@ -194,6 +200,8 @@ function ExtrasCard({ entries, kcalGoal, onOpen }: { entries: Entry[]; kcalGoal:
         );
       })}
       {partialTotal.count > 0 && <p className="muted small legend">{t.extras.dishPartial}</p>}
+        </div>
+      </div>
     </section>
   );
 }
