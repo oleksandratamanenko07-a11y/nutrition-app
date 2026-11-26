@@ -4,6 +4,15 @@ import type { Day, Entry, Profile } from '../lib/api';
 import { goalStatus } from '../lib/calc';
 import { fmtG, fmtKcal, totals } from '../lib/day';
 import { macroBreakdown, type Macro } from '../lib/breakdown';
+import {
+  EXTRA_KEYS,
+  extraPct,
+  extrasBreakdown,
+  extrasTotal,
+  extraZone,
+  referenceFor,
+  type ExtraKey,
+} from '../lib/extras';
 import { AchievementsSummary } from './Achievements';
 import { Sheet } from './ui';
 
@@ -138,6 +147,101 @@ function MacroSheet({
   );
 }
 
+const nf1 = (x: number) => fmtG(x);
+
+function refText(k: ExtraKey, amount: number): string {
+  return (k === 'fiber' ? t.extras.refFiber : t.extras.refMax).replace('{n}', String(amount));
+}
+
+/** Окремий від КБЖУ блок: клітковина, цукор, сіль. Дані необов'язкові, тому завжди видно, для скількох записів вони відомі. */
+function ExtrasCard({ entries, kcalGoal, onOpen }: { entries: Entry[]; kcalGoal: number | null; onOpen: (k: ExtraKey) => void }) {
+  if (entries.length === 0) return null;
+  const partialTotal = extrasTotal(entries, 'fiber');
+  return (
+    <section className="card extras-card">
+      <h2>{t.extras.title}</h2>
+      {EXTRA_KEYS.map((k) => {
+        const tot = extrasTotal(entries, k);
+        const ref = referenceFor(k, kcalGoal);
+        const zone = extraZone(tot, ref);
+        const pct = Math.min(extraPct(tot, ref), 100);
+        return (
+          <button type="button" key={k} className={`macro macro-btn ${zone ? `st-${zone}` : ''}`} onClick={() => onOpen(k)}>
+            <div className="macro-head">
+              <span>
+                {t.extras[k]} <span className="chev">›</span>
+              </span>
+              <span className={zone ? 'st-text' : 'muted'}>
+                {tot.known === 0
+                  ? t.extras.noData
+                  : `${tot.missing > 0 ? `${t.extras.atLeast} ` : ''}${nf1(tot.value)} ${t.home.g}`}
+                <span className="muted small"> · {refText(k, ref.amount)}</span>
+              </span>
+            </div>
+            <div className="bar">
+              <div className={`bar-fill ${zone ? 'st-fill' : 'bar-neutral'}`} style={{ width: `${tot.known === 0 ? 0 : pct}%` }} />
+            </div>
+            {tot.known > 0 && tot.missing > 0 && (
+              <div className="muted small extras-partial">
+                {t.extras.partial.replace('{known}', String(tot.known)).replace('{count}', String(tot.count))}
+              </div>
+            )}
+          </button>
+        );
+      })}
+      {partialTotal.count > 0 && <p className="muted small legend">{t.extras.dishPartial}</p>}
+    </section>
+  );
+}
+
+/** Внесок кожного запису в клітковину, цукор або сіль за день; записи без даних — окремо, як «не вказано». */
+function ExtrasSheet({ k, entries, kcalGoal, onClose }: { k: ExtraKey; entries: Entry[]; kcalGoal: number | null; onClose: () => void }) {
+  const { rows, total } = extrasBreakdown(entries, k);
+  const ref = referenceFor(k, kcalGoal);
+  const zone = extraZone(total, ref);
+  const pct = Math.min(extraPct(total, ref), 100);
+  return (
+    <Sheet title={t.extras[k]} onClose={onClose}>
+      <div className={zone ? `st-${zone}` : ''}>
+        <div className="macro-head">
+          <span className="muted">{t.home.eaten}</span>
+          <span className={zone ? 'st-text' : ''}>
+            {total.known === 0 ? t.extras.noData : `${total.missing > 0 ? `${t.extras.atLeast} ` : ''}${nf1(total.value)} ${t.home.g}`}
+            <span className="muted small"> · {refText(k, ref.amount)}</span>
+          </span>
+        </div>
+        <div className="bar">
+          <div className={`bar-fill ${zone ? 'st-fill' : 'bar-neutral'}`} style={{ width: `${total.known === 0 ? 0 : pct}%` }} />
+        </div>
+      </div>
+      {total.known > 0 && total.missing > 0 && (
+        <p className="muted small">{t.extras.partial.replace('{known}', String(total.known)).replace('{count}', String(total.count))}</p>
+      )}
+      {total.known === 0 && <p className="muted">{t.extras.allMissing}</p>}
+
+      <div className="macro-list">
+        {rows.map((r) => (
+          <div className="macro-row" key={r.id}>
+            <span className="entry-main">
+              <span className="entry-name">
+                {r.name}
+                {r.isDish && <span className="badge">{t.home.dishBadge}</span>}
+              </span>
+              <span className="muted small">
+                {t.meals[r.meal as Entry['meal']]} · {fmtG(r.amount_g)} {t.home.g}
+              </span>
+            </span>
+            <b className={r.value === null ? 'missing' : ''}>
+              {r.value === null ? t.extras.notSpecified : `${nf1(r.value)} ${t.home.g}`}
+            </b>
+          </div>
+        ))}
+      </div>
+      <p className="muted small">{t.extras.note}</p>
+    </Sheet>
+  );
+}
+
 export function Home({
   profile,
   day,
@@ -153,6 +257,7 @@ export function Home({
 }) {
   const [busy, setBusy] = useState(false);
   const [openMacro, setOpenMacro] = useState<Macro | null>(null);
+  const [openExtra, setOpenExtra] = useState<ExtraKey | null>(null);
   const sum = totals(day.entries);
   const kcalGoal = profile.kcal_goal ?? 0;
   const waterGoal = profile.water_goal_ml ?? 2000;
@@ -206,6 +311,8 @@ export function Home({
         <p className="muted small legend">{t.home.legend}</p>
       </section>
 
+      <ExtrasCard entries={day.entries} kcalGoal={profile.kcal_goal} onOpen={setOpenExtra} />
+
       <section className="card">
         <div className="macro-head">
           <h2>{t.home.water}</h2>
@@ -229,6 +336,9 @@ export function Home({
         </div>
       </section>
       {days && <AchievementsSummary days={days} today={today} />}
+      {openExtra && (
+        <ExtrasSheet k={openExtra} entries={day.entries} kcalGoal={profile.kcal_goal} onClose={() => setOpenExtra(null)} />
+      )}
       {openMacro && (
         <MacroSheet
           macro={openMacro}
