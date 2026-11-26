@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { saveSettings } from '../lib/api';
 import { askWriteAccess } from '../lib/telegram';
 import { WeightScreen } from './WeightScreen';
+import { Stats } from './Stats';
 import { AchievementsFull } from './Achievements';
 import { Calendar } from './Calendar';
 
@@ -24,9 +25,11 @@ export function ProfileTab({
     v === null ? '—' : `${Number(v).toLocaleString('uk-UA')} ${t.profile.kg}`;
   const [calendar, setCalendar] = useState(false);
   const [weight, setWeight] = useState(false);
+  const [stats, setStats] = useState(false);
   const [remindError, setRemindError] = useState('');
   const [busy, setBusy] = useState(false);
   if (calendar) return <Calendar today={today} onClose={() => setCalendar(false)} />;
+  if (stats) return <Stats today={today} onClose={() => setStats(false)} />;
   if (weight) {
     return (
       <WeightScreen
@@ -64,6 +67,10 @@ export function ProfileTab({
 
       <button type="button" className="secondary wide" onClick={() => setCalendar(true)}>
         📅 {t.calendar.open}
+      </button>
+
+      <button type="button" className="secondary wide" onClick={() => setStats(true)}>
+        📈 {t.stats.open}
       </button>
 
       <button type="button" className="secondary wide" onClick={() => setWeight(true)}>
