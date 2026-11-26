@@ -510,6 +510,9 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
       </div>
       {tab === 'shared' && (
         <SharedDishes
+          today={today}
+          meal={defaultMeal()}
+          onDiaryAdded={onAdded}
           onCopyEdit={(r) => setView({ k: 'edit', r, copy: { sourceId: r.id, originalNote: r.note ?? null } })}
           onAdded={async () => {
             setTab('mine');
