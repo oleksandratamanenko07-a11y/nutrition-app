@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUser } from './_lib/auth.js';
 import { db } from './_lib/supabase.js';
 import { parseExtras, type Extras } from './_lib/extras.js';
+import { refreshCopies } from './_lib/library.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CATEGORIES = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
@@ -71,7 +72,8 @@ function parseBody(b: Record<string, unknown>) {
     if (typeof b.is_public !== 'boolean') return null;
     isPublic = b.is_public;
   }
-  return { name, image, weight, ingredients, category, isPublic };
+  const sourceId = typeof b.source_id === 'string' && UUID_RE.test(b.source_id) ? b.source_id : null;
+  return { name, image, weight, ingredients, category, isPublic, sourceId };
 }
 
 /**
@@ -163,11 +165,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }));
 
       if (req.method === 'POST') {
+        // Звідки скопійовано: лише якщо оригінал публічний (інакше посилання ігноруємо)
+        let sourceId: string | null = null;
+        if (p.sourceId) {
+          const { data: s } = await supabase
+            .from('recipes').select('id').eq('id', p.sourceId).eq('is_public', true).maybeSingle();
+          sourceId = s?.id ?? null;
+        }
         const { data: rec, error } = await supabase
           .from('recipes')
           .insert({
             owner_id: uid, name: p.name, image_data: p.image, total_weight_g: p.weight,
-            category: p.category, is_public: p.isPublic ?? true,
+            category: p.category, is_public: p.isPublic ?? true, source_id: sourceId,
           })
           .select('id')
           .single();
@@ -177,6 +186,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await supabase.from('recipes').delete().eq('id', rec.id).eq('owner_id', uid);
           throw ie;
         }
+        if (sourceId) await refreshCopies(supabase, sourceId);
         return res.status(200).json({ id: rec.id });
       }
 
