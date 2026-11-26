@@ -39,7 +39,7 @@ export function ProfileTab({
     );
   }
 
-  async function toggle(key: 'remind_diary' | 'remind_weight') {
+  async function toggle(key: 'remind_diary' | 'remind_weight' | 'remind_review') {
     if (busy) return;
     const next = !(profile[key] ?? true);
     setBusy(true);
@@ -134,6 +134,15 @@ export function ProfileTab({
             checked={profile.remind_weight ?? true}
             disabled={busy}
             onChange={() => void toggle('remind_weight')}
+          />
+        </label>
+        <label className="switch-row">
+          <span>{t.reminders.review}</span>
+          <input
+            type="checkbox"
+            checked={profile.remind_review ?? true}
+            disabled={busy}
+            onChange={() => void toggle('remind_review')}
           />
         </label>
         <p className="muted small">{t.reminders.note}</p>
