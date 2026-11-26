@@ -16,6 +16,7 @@ import { AddFlow, Thumb } from './AddFlow';
 import { DishAddForm } from './DishAdd';
 import { SharedDishes } from './SharedDishes';
 import { CategoryChips } from './CategoryChips';
+import { NoteBlock } from './NoteBlock';
 import { errorText, ok, parseNum, Sheet } from './ui';
 
 const NAME: Record<Nutrient, string> = {
@@ -92,7 +93,7 @@ function DishEditor({
 }: {
   recipe: Recipe | null;
   /** Нова страва-копія: recipe — зразок, copyOf — id публічного оригіналу (або null для власної) */
-  copyOf?: { sourceId: string | null } | null;
+  copyOf?: { sourceId: string | null; originalNote?: string | null } | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -103,6 +104,8 @@ function DishEditor({
   const [imageChanged, setImageChanged] = useState(false);
   const isCopy = !!copyOf;
   const [isPublic, setIsPublic] = useState(isCopy ? false : recipe ? recipe.is_public !== false : true); // нові страви публічні за замовчуванням
+  // Власний коментар: у копії чужої страви починається порожнім (коментар оригіналу показується окремо, лише для читання)
+  const [note, setNote] = useState(copyOf?.sourceId ? '' : recipe?.note ?? '');
   const [category, setCategory] = useState<Category | ''>(normCategory(recipe?.category) ?? '');
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -149,6 +152,7 @@ function DishEditor({
         total_weight_g: w,
         is_public: isPublic,
         category: category || null,
+        note: note.trim() === '' ? null : note.trim(),
         ingredients: ings,
       });
       await onSaved();
@@ -221,6 +225,24 @@ function DishEditor({
             {t.dishes.publicLabel}
             <span className="muted small"> {isPublic ? t.dishes.publicHint : t.dishes.privateHint}</span>
           </span>
+        </label>
+
+        {copyOf?.originalNote && (
+          <>
+            <NoteBlock title={t.dishes.originalNote} text={copyOf.originalNote} />
+            <p className="muted small">{t.dishes.originalNoteHint}</p>
+          </>
+        )}
+        <label className="field">
+          <span>{t.dishes.note}</span>
+          <textarea
+            rows={3}
+            maxLength={500}
+            value={note}
+            placeholder={t.dishes.notePlaceholder}
+            onChange={(e) => setNote(e.target.value)}
+          />
+          <span className="muted small">{t.dishes.noteCount.replace('{n}', String(note.length))}</span>
         </label>
 
         <h3 className="subhead">{t.dishes.ingredients}</h3>
@@ -404,6 +426,9 @@ function DishDetail({
         {fmt1(tot.fat)} · {t.diary.c} {fmt1(tot.carbs)}
       </p>
 
+      <NoteBlock title={t.dishes.authorNote} text={recipe.note} />
+      <NoteBlock title={t.dishes.originalNote} text={recipe.source_note} />
+
       <h3 className="subhead">{t.dishes.composition}</h3>
       {recipe.ingredients.map((i, idx) => (
         <div className="row" key={idx}>
@@ -446,7 +471,7 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('');
   const [view, setView] = useState<
-    { k: 'none' } | { k: 'detail'; r: Recipe } | { k: 'edit'; r: Recipe | null; copy?: { sourceId: string | null } }
+    { k: 'none' } | { k: 'detail'; r: Recipe } | { k: 'edit'; r: Recipe | null; copy?: { sourceId: string | null; originalNote?: string | null } }
   >({ k: 'none' });
 
   const load = useCallback(async () => {
@@ -485,7 +510,7 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
       </div>
       {tab === 'shared' && (
         <SharedDishes
-          onCopyEdit={(r) => setView({ k: 'edit', r, copy: { sourceId: r.id } })}
+          onCopyEdit={(r) => setView({ k: 'edit', r, copy: { sourceId: r.id, originalNote: r.note ?? null } })}
           onAdded={async () => {
             setTab('mine');
             await load();
