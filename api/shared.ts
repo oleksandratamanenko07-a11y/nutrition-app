@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUser } from './_lib/auth.js';
 import { db } from './_lib/supabase.js';
-import { refreshCopies } from './_lib/library.js';
+import { CATEGORIES, normCategory, refreshCopies } from './_lib/library.js';
 
 const PAGE = 15;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -14,7 +14,7 @@ const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 
 /**
  * Загальна бібліотека страв.
- *   GET  /api/shared?q=...&offset=0    — опубліковані страви інших користувачів
+ *   GET  /api/shared?q=...&offset=0&category=...  — опубліковані страви інших користувачів
  *   POST /api/shared {type:'copy', id} — додати страву до своїх (незалежна копія, без дублів)
  *
  * Безпека: owner_id не вибирається і не віддається, food_id інгредієнтів теж (це посилання на чужу базу).
@@ -36,6 +36,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .select('id,name,image_data,total_weight_g,category,copies_count,created_at')
         .eq('is_public', true)
         .neq('owner_id', user.id);
+      const cat = one(req.query.category);
+      if (cat === 'none') query = query.is('category', null);
+      else if ((CATEGORIES as readonly string[]).includes(cat)) query = query.eq('category', cat);
       for (const tk of tokens) query = query.ilike('name', `%${tk}%`);
       const { data: rows, error } = await query
         .order('created_at', { ascending: false })
@@ -60,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           name: r.name,
           image_data: r.image_data ?? null,
           total_weight_g: num(r.total_weight_g),
-          category: r.category ?? null,
+          category: normCategory(r.category),
           copies_count: Number(r.copies_count ?? 0),
           created_at: r.created_at,
           ingredients: ings
