@@ -2,10 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUser } from './_lib/auth.js';
 import { db } from './_lib/supabase.js';
 import { parseExtras, type Extras } from './_lib/extras.js';
-import { refreshCopies } from './_lib/library.js';
+import { CATEGORIES, normCategory, refreshCopies } from './_lib/library.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const CATEGORIES = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
 const IMG_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/;
 
 interface IngredientIn {
@@ -63,7 +62,7 @@ function parseBody(b: Record<string, unknown>) {
   }
   let category: string | null = null;
   if (b.category !== undefined && b.category !== null && b.category !== '') {
-    if (typeof b.category !== 'string' || !CATEGORIES.includes(b.category)) return null;
+    if (typeof b.category !== 'string' || !(CATEGORIES as readonly string[]).includes(b.category)) return null;
     category = b.category;
   }
   // is_public: не передали — undefined (не чіпаємо при зміні, true для нової страви)
@@ -118,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           image_data: r.image_data ?? null,
           total_weight_g: num2(r.total_weight_g),
           is_public: r.is_public !== false,
-          category: r.category ?? null,
+          category: normCategory(r.category),
           ingredients: ings
             .filter((i) => i.recipe_id === r.id)
             .map((i) => ({
