@@ -37,6 +37,9 @@ export interface SnapshotItem {
   protein_100: number | null;
   fat_100: number | null;
   carbs_100: number | null;
+  fiber_100?: number | null;
+  sugar_100?: number | null;
+  salt_100?: number | null;
 }
 
 export interface Entry {
@@ -51,6 +54,9 @@ export interface Entry {
   protein_100: number;
   fat_100: number;
   carbs_100: number;
+  fiber_100?: number | null;
+  sugar_100?: number | null;
+  salt_100?: number | null;
 }
 
 export interface Day {
@@ -129,6 +135,9 @@ function normEntry(e: Entry): Entry {
     protein_100: Number(e.protein_100),
     fat_100: Number(e.fat_100),
     carbs_100: Number(e.carbs_100),
+    fiber_100: e.fiber_100 == null ? null : Number(e.fiber_100),
+    sugar_100: e.sugar_100 == null ? null : Number(e.sugar_100),
+    salt_100: e.salt_100 == null ? null : Number(e.salt_100),
   };
 }
 
@@ -154,6 +163,9 @@ export interface NewEntry {
   protein_100: number;
   fat_100: number;
   carbs_100: number;
+  fiber_100?: number | null;
+  sugar_100?: number | null;
+  salt_100?: number | null;
 }
 
 export async function addEntry(input: NewEntry): Promise<Entry> {
@@ -207,6 +219,9 @@ export interface Food {
   protein_100: number | null;
   fat_100: number | null;
   carbs_100: number | null;
+  fiber_100?: number | null;
+  sugar_100?: number | null;
+  salt_100?: number | null;
   source: 'saved' | 'openfoodfacts' | 'usda';
   kcal_from_kj: boolean;
   suspicious: boolean;
