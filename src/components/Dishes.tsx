@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '../i18n/uk';
-import { deleteRecipe, getRecipes, saveRecipe, type Meal, type Recipe } from '../lib/api';
+import { CATEGORIES, deleteRecipe, getRecipes, saveRecipe, type Category, type Meal, type Recipe } from '../lib/api';
 import { fmtKcal } from '../lib/day';
 import { photoToDataUrl } from '../lib/image';
 import {
@@ -14,6 +14,7 @@ import {
 } from '../lib/recipe';
 import { AddFlow, Thumb } from './AddFlow';
 import { DishAddForm } from './DishAdd';
+import { SharedDishes } from './SharedDishes';
 import { errorText, ok, parseNum, Sheet } from './ui';
 
 const NAME: Record<Nutrient, string> = {
@@ -96,6 +97,8 @@ function DishEditor({
   const [weight, setWeight] = useState(recipe?.total_weight_g ? String(recipe.total_weight_g) : '');
   const [image, setImage] = useState<string | null>(recipe?.image_data ?? null);
   const [imageChanged, setImageChanged] = useState(false);
+  const [isPublic, setIsPublic] = useState(recipe ? recipe.is_public !== false : true); // нові страви публічні за замовчуванням
+  const [category, setCategory] = useState<Category | ''>(recipe?.category ?? '');
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -138,6 +141,8 @@ function DishEditor({
         name: name.trim(),
         ...(imageChanged || !recipe ? { image_data: image } : {}),
         total_weight_g: w,
+        is_public: isPublic,
+        category: category || null,
         ingredients: ings,
       });
       await onSaved();
@@ -190,6 +195,26 @@ function DishEditor({
             )}
           </div>
         </div>
+
+        <label className="field">
+          <span>{t.dishes.category}</span>
+          <select value={category} onChange={(e) => setCategory(e.target.value as Category | '')}>
+            <option value="">{t.dishes.noCategory}</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {t.dishes.cat[c]}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="check">
+          <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
+          <span>
+            {t.dishes.publicLabel}
+            <span className="muted small"> {isPublic ? t.dishes.publicHint : t.dishes.privateHint}</span>
+          </span>
+        </label>
 
         <h3 className="subhead">{t.dishes.ingredients}</h3>
         {rows.length === 0 && <p className="muted small">{t.dishes.noIngredients}</p>}
@@ -405,6 +430,7 @@ function defaultMeal(): Meal {
 export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promise<void> }) {
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
   const [error, setError] = useState('');
+  const [tab, setTab] = useState<'mine' | 'shared'>('mine');
   const [view, setView] = useState<
     { k: 'none' } | { k: 'detail'; r: Recipe } | { k: 'edit'; r: Recipe | null }
   >({ k: 'none' });
@@ -425,6 +451,17 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
   return (
     <>
       <h1>{t.dishes.title}</h1>
+
+      <div className="segmented" style={{ marginBottom: 10 }}>
+        <button type="button" className={tab === 'mine' ? 'active' : ''} onClick={() => setTab('mine')}>
+          {t.dishes.mine}
+        </button>
+        <button type="button" className={tab === 'shared' ? 'active' : ''} onClick={() => setTab('shared')}>
+          {t.dishes.shared}
+        </button>
+      </div>
+      {tab === 'shared' && <SharedDishes />}
+      {tab === 'mine' && <>
 
       <button type="button" className="primary" style={{ margin: '8px 0 12px' }} onClick={() => setView({ k: 'edit', r: null })}>
         + {t.dishes.create}
@@ -451,7 +488,10 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
           <button type="button" className="card dish-card" key={r.id} onClick={() => setView({ k: 'detail', r })}>
             <Thumb url={r.image_data} />
             <span className="entry-main">
-              <span className="entry-name">{r.name}</span>
+              <span className="entry-name">
+                {r.name}
+                <span className="badge">{r.is_public === false ? t.dishes.badgePrivate : t.dishes.badgePublic}</span>
+              </span>
               <span className="muted small">
                 {fmt1(tot.weight)} г · {t.diary.p} {fmt1(tot.protein)} · {t.diary.f} {fmt1(tot.fat)} · {t.diary.c}{' '}
                 {fmt1(tot.carbs)}
@@ -461,6 +501,8 @@ export function Dishes({ today, onAdded }: { today: string; onAdded: () => Promi
           </button>
         );
       })}
+
+      </>}
 
       {view.k === 'detail' && (
         <DishDetail
