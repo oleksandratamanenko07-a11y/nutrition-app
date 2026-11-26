@@ -1171,3 +1171,100 @@ button.macro-btn:active {
   grid-template-columns: 2fr 1fr;
   gap: 8px;
 }
+
+/* ---------- Вага та нагадування ---------- */
+
+.weight-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 12px;
+}
+
+.weight-chart .axis {
+  font-size: 10px;
+  fill: var(--muted);
+}
+
+.weight-chart .axis-line {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.weight-chart .target-line {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.weight-chart .weight-line {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.weight-chart .weight-dot {
+  fill: var(--accent);
+}
+
+.progress {
+  height: 10px;
+  margin: 6px 0 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.progress i {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--accent);
+}
+
+.reached {
+  margin: 4px 0 8px;
+  font-weight: 600;
+}
+
+.recalc h2 {
+  margin-top: 0;
+}
+
+.weight-row {
+  align-items: center;
+  gap: 12px;
+}
+
+.weight-row b {
+  margin-left: auto;
+}
+
+.link-danger {
+  border: 0;
+  background: transparent;
+  color: var(--st-high, #d33);
+  font-size: 14px;
+  padding: 4px 0;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.switch-row:first-of-type {
+  border-top: 0;
+}
+
+.switch-row input {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
