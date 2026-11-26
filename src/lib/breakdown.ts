@@ -1,6 +1,8 @@
 import type { Entry } from './api';
 
 export type Macro = 'protein' | 'fat' | 'carbs';
+/** Те, що можна розкласти по записах: макронутрієнти й калорії */
+export type Breakdown = Macro | 'kcal';
 
 export interface BreakdownRow {
   id: string;
@@ -17,14 +19,14 @@ export interface BreakdownRow {
 const scaled = (per100: number, grams: number) =>
   (Math.round(per100 * 100) * Math.round(grams * 100)) / 1e6;
 
-const FIELD = { protein: 'protein_100', fat: 'fat_100', carbs: 'carbs_100' } as const;
+const FIELD = { kcal: 'kcal_100', protein: 'protein_100', fat: 'fat_100', carbs: 'carbs_100' } as const;
 
 /**
  * Внесок кожного запису щоденника в обраний макронутрієнт.
  * Значення беруться з тих самих записів, що й підсумок на головній.
  * total складається в порядку записів — так само, як day.totals(), тож збігається з головною до останнього знака.
  */
-export function macroBreakdown(entries: Entry[], macro: Macro): { rows: BreakdownRow[]; total: number } {
+export function macroBreakdown(entries: Entry[], macro: Breakdown): { rows: BreakdownRow[]; total: number } {
   const rows: BreakdownRow[] = entries.map((e) => ({
     id: e.id,
     name: e.name,
