@@ -10,14 +10,18 @@ import {
   WEIGHT_RECENT_DAYS,
   type Due,
 } from './_lib/reminders.js';
+import { analyze, reviewMessage, reviewWindow, type ReviewEntry, type ReviewGoal } from './_lib/review.js';
 
 interface Row {
   telegram_id: number;
   tz: string | null;
   remind_diary: boolean;
   remind_weight: boolean;
+  remind_review: boolean;
   last_diary_reminder: string | null;
   last_weight_reminder: string | null;
+  last_review_date: string | null;
+  last_review_check: string | null;
 }
 
 type SendResult = 'sent' | 'blocked' | 'rate_limited' | 'error';
@@ -74,10 +78,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('telegram_id,tz,remind_diary,remind_weight,last_diary_reminder,last_weight_reminder')
+      .select('telegram_id,tz,remind_diary,remind_weight,remind_review,last_diary_reminder,last_weight_reminder,last_review_date,last_review_check')
       .eq('onboarded', true)
       .not('tz', 'is', null)
-      .or('remind_diary.eq.true,remind_weight.eq.true')
+      .or('remind_diary.eq.true,remind_weight.eq.true,remind_review.eq.true')
       .limit(5000);
     if (error) throw error;
 
@@ -90,6 +94,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         weightOn: row.remind_weight,
         lastDiary: row.last_diary_reminder,
         lastWeight: row.last_weight_reminder,
+        reviewOn: row.remind_review,
+        lastReview: row.last_review_date,
+        lastReviewCheck: row.last_review_check,
       });
       if (due) candidates.push({ row, due });
     }
@@ -102,6 +109,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const uid = row.telegram_id;
       const since = addDaysStr(due.date, -DORMANT_DAYS);
       const weightSince = addDaysStr(due.date, -WEIGHT_RECENT_DAYS);
+
+      const blockAll = () =>
+        supabase
+          .from('profiles')
+          .update({ remind_diary: false, remind_weight: false, remind_review: false })
+          .eq('telegram_id', uid);
+
+      // Аналітика за 3 повні дні: раз на 3 дні вранці, якщо є записи щонайменше за 2 дні
+      if (due.review) {
+        const window = reviewWindow(due.date);
+        const [entries, goals] = await Promise.all([
+          supabase
+            .from('diary_entries')
+            .select('entry_date,amount_g,kcal_100,protein_100,fat_100,carbs_100')
+            .eq('owner_id', uid)
+            .gte('entry_date', window[0])
+            .lte('entry_date', window[window.length - 1])
+            .limit(2000),
+          supabase
+            .from('goal_history')
+            .select('effective_from,kcal_goal,protein_goal_g,fat_goal_g,carbs_goal_g')
+            .eq('owner_id', uid)
+            .order('effective_from', { ascending: true })
+            .limit(2000),
+        ]);
+        if (entries.error || goals.error) {
+          stats.failed++;
+        } else {
+          const review = analyze((entries.data ?? []) as ReviewEntry[], (goals.data ?? []) as ReviewGoal[], window);
+          let sentReview = false;
+          if (review && !stop) {
+            const result = await send(token, uid, reviewMessage(review));
+            if (result === 'sent') {
+              stats.sent++;
+              sentReview = true;
+            } else if (result === 'blocked') {
+              stats.blocked++;
+              await blockAll();
+              return;
+            } else if (result === 'rate_limited') {
+              stop = true;
+              stats.failed++;
+            } else {
+              stats.failed++;
+            }
+          }
+          // Дані є, але повідомлення не пішло через збій — не позначаємо день, спробуємо наступної години
+          if (sentReview || !review) {
+            const { error: markError } = await supabase
+              .from('profiles')
+              .update(sentReview ? { last_review_date: due.date, last_review_check: due.date } : { last_review_check: due.date })
+              .eq('telegram_id', uid);
+            if (markError) console.error('review mark error', markError);
+          }
+        }
+      }
+      if (!due.diary && !due.weight) return;
 
       const [today, recent, weight] = await Promise.all([
         due.diary
@@ -138,7 +202,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else if (result === 'blocked') {
           // бот не може писати цьому користувачу — вимикаємо нагадування (користувач може ввімкнути знову в профілі)
           stats.blocked++;
-          await supabase.from('profiles').update({ remind_diary: false, remind_weight: false }).eq('telegram_id', uid);
+          await blockAll();
           return;
         } else if (result === 'rate_limited') {
           stop = true;
