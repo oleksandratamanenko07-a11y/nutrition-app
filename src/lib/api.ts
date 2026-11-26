@@ -283,6 +283,8 @@ export interface RecipeInput {
   total_weight_g: number | null;
   is_public?: boolean;
   category?: Category | null;
+  /** Лише для нової страви-копії: з якої публічної страви скопійовано */
+  source_id?: string | null;
   ingredients: Ingredient[];
 }
 
@@ -301,6 +303,11 @@ export interface SharedRecipe extends Recipe {
 
 export async function getShared(q: string, offset: number): Promise<{ items: SharedRecipe[]; has_more: boolean }> {
   return request(`/api/shared?q=${encodeURIComponent(q)}&offset=${offset}`);
+}
+
+/** Додати чужу страву до своїх (незалежна копія). already — копія вже була, дубль не створено */
+export async function copyShared(id: string): Promise<{ id: string; already: boolean }> {
+  return request('/api/shared', { method: 'POST', body: JSON.stringify({ type: 'copy', id }) });
 }
 
 export async function deleteRecipe(id: string): Promise<void> {
