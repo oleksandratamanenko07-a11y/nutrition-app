@@ -15,6 +15,10 @@ export interface Ingredient {
   protein_100: number | null;
   fat_100: number | null;
   carbs_100: number | null;
+  /** Додатково, на 100 г; null/відсутнє — «не вказано» */
+  fiber_100?: number | null;
+  sugar_100?: number | null;
+  salt_100?: number | null;
 }
 
 export interface DishTotals {
@@ -64,6 +68,27 @@ export function dishPer100(tot: DishTotals): { kcal: number; protein: number; fa
   if (tot.missing.length > 0 || !(tot.weight > 0)) return null;
   const r2 = (x: number) => Math.round(((x * 100) / tot.weight) * 100) / 100;
   return { kcal: r2(tot.kcal), protein: r2(tot.protein), fat: r2(tot.fat), carbs: r2(tot.carbs) };
+}
+
+/**
+ * Клітковина, цукор і сіль на 100 г страви. Якщо хоча б в одного інгредієнта показника немає —
+ * для страви він «не вказано» (null): неповну суму за повну не видаємо.
+ */
+export function dishExtrasPer100(
+  ings: Ingredient[],
+  weight: number,
+): { fiber_100: number | null; sugar_100: number | null; salt_100: number | null } {
+  const one = (field: 'fiber_100' | 'sugar_100' | 'salt_100'): number | null => {
+    if (!(weight > 0) || ings.length === 0) return null;
+    let total = 0;
+    for (const i of ings) {
+      const v = i[field];
+      if (v === null || v === undefined) return null;
+      total += scaled(v, i.amount_g);
+    }
+    return Math.round(((total * 100) / weight) * 100) / 100;
+  };
+  return { fiber_100: one('fiber_100'), sugar_100: one('sugar_100'), salt_100: one('salt_100') };
 }
 
 /** Перевірка фізичної правдоподібності ваги готової страви: БЖВ не можуть важити більше за страву. */
