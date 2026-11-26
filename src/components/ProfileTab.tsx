@@ -1,6 +1,7 @@
 import { t } from '../i18n/uk';
 import type { Profile } from '../lib/api';
 import { useState } from 'react';
+import { getMacroView, setMacroView, type MacroView } from '../lib/prefs';
 import { saveSettings } from '../lib/api';
 import { askWriteAccess } from '../lib/telegram';
 import { WeightScreen } from './WeightScreen';
@@ -23,6 +24,7 @@ export function ProfileTab({
 }) {
   const kg = (v: number | null) =>
     v === null ? '—' : `${Number(v).toLocaleString('uk-UA')} ${t.profile.kg}`;
+  const [macroView, setView] = useState<MacroView>(getMacroView);
   const [calendar, setCalendar] = useState(false);
   const [weight, setWeight] = useState(false);
   const [stats, setStats] = useState(false);
@@ -121,6 +123,26 @@ export function ProfileTab({
           <span className="muted">{t.onboarding.water}</span>
           <b>{profile.water_goal_ml}</b>
         </div>
+      </section>
+
+      <section className="card">
+        <h2>{t.profile.macroView}</h2>
+        <div className="segmented">
+          {(['rings', 'classic'] as MacroView[]).map((v) => (
+            <button
+              type="button"
+              key={v}
+              className={macroView === v ? 'active' : ''}
+              onClick={() => {
+                setView(v);
+                setMacroView(v);
+              }}
+            >
+              {v === 'rings' ? t.profile.macroViewRings : t.profile.macroViewClassic}
+            </button>
+          ))}
+        </div>
+        <p className="muted small">{t.profile.macroViewNote}</p>
       </section>
 
       <section className="card">
