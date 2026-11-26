@@ -262,8 +262,13 @@ export interface Recipe {
   image_data: string | null;
   /** Вага готової страви, якщо вказана вручну */
   total_weight_g: number | null;
+  is_public?: boolean;
+  category?: Category | null;
   ingredients: Ingredient[];
 }
+
+export type Category = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'dessert';
+export const CATEGORIES: Category[] = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
 
 export async function getRecipes(): Promise<Recipe[]> {
   const r = await request<{ recipes: Recipe[] }>('/api/recipes');
@@ -276,6 +281,8 @@ export interface RecipeInput {
   /** undefined — не змінювати фото, null — прибрати */
   image_data?: string | null;
   total_weight_g: number | null;
+  is_public?: boolean;
+  category?: Category | null;
   ingredients: Ingredient[];
 }
 
@@ -284,6 +291,16 @@ export async function saveRecipe(input: RecipeInput): Promise<void> {
     method: input.id ? 'PUT' : 'POST',
     body: JSON.stringify(input),
   });
+}
+
+/** Страва із загальної бібліотеки: без автора й без посилань на чужі продукти */
+export interface SharedRecipe extends Recipe {
+  copies_count: number;
+  created_at: string;
+}
+
+export async function getShared(q: string, offset: number): Promise<{ items: SharedRecipe[]; has_more: boolean }> {
+  return request(`/api/shared?q=${encodeURIComponent(q)}&offset=${offset}`);
 }
 
 export async function deleteRecipe(id: string): Promise<void> {
