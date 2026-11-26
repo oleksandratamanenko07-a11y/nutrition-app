@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUser } from './_lib/auth.js';
 import { db } from './_lib/supabase.js';
 import { orderedTimestamps } from './_lib/quick.js';
+import { knownExtras, parseExtras } from './_lib/extras.js';
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -124,6 +125,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             protein_100: r.protein_100,
             fat_100: r.fat_100,
             carbs_100: r.carbs_100,
+            fiber_100: r.fiber_100 ?? null,
+            sugar_100: r.sugar_100 ?? null,
+            salt_100: r.salt_100 ?? null,
             recipe_snapshot: r.recipe_snapshot ?? null,
             created_at: stamps[idx],
           })),
@@ -175,6 +179,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           : b.source === 'recipe' ? 'recipe'
           : 'manual';
         const details = { barcode, brand, country, image_url: image, source };
+        // Клітковина, цукор, сіль — необов'язкові (null = «не вказано»)
+        const extras = parseExtras(b);
 
         // Продукт зберігаємо в особисту базу (без дублікатів).
         // За штрихкодом шукаємо спершу: виправлення користувача оновлюють збережений продукт.
@@ -209,7 +215,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let foodId: string | null = existingId;
         const now = new Date().toISOString();
         if (foodId) {
-          const patch: Record<string, unknown> = { last_used_at: now, name, ...values };
+          const patch: Record<string, unknown> = { last_used_at: now, name, ...values, ...knownExtras(extras) };
           if (barcode) Object.assign(patch, details);
           if (source === 'manual') delete patch.source; // не затираємо походження збереженого продукту
           const { error: upError } = await supabase.from('foods').update(patch).eq('id', foodId).eq('owner_id', uid);
@@ -217,7 +223,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else {
           const { data: food, error: foodError } = await supabase
             .from('foods')
-            .insert({ owner_id: uid, name, last_used_at: now, ...values, ...details })
+            .insert({ owner_id: uid, name, last_used_at: now, ...values, ...extras, ...details })
             .select('id')
             .single();
           if (foodError) throw foodError;
@@ -234,6 +240,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             protein_100: num(i?.protein_100, 0, 100),
             fat_100: num(i?.fat_100, 0, 100),
             carbs_100: num(i?.carbs_100, 0, 100),
+            ...parseExtras(i),
           }));
           if (items.every((i) => i.name && i.amount_g !== null)) snapshot = items;
         }
@@ -249,6 +256,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             name,
             amount_g: round2(grams),
             ...values,
+            ...extras,
           })
           .select('*')
           .single();
