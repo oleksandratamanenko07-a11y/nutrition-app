@@ -1268,3 +1268,84 @@ button.macro-btn:active {
   flex-shrink: 0;
   accent-color: var(--accent);
 }
+
+/* ---------- Статистика ---------- */
+
+.bar-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 8px;
+}
+
+.bar-chart .axis {
+  font-size: 10px;
+  fill: var(--muted);
+}
+
+.bar-chart .axis-line {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.bar-chart .bar {
+  fill: var(--st, var(--accent));
+}
+
+.bar-chart .bar-today {
+  opacity: 0.45;
+}
+
+.bar-chart .bar-selected {
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+
+.bar-chart .goal-tick {
+  stroke: var(--text);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 2;
+  opacity: 0.55;
+}
+
+.bar-chart .bar-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.avg-kcal {
+  margin-bottom: 8px;
+}
+
+.share-bar {
+  display: flex;
+  height: 14px;
+  margin: 10px 0 8px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.share-bar i {
+  display: block;
+  height: 100%;
+}
+
+.share-p { background: var(--protein); }
+.share-f { background: var(--fat); }
+.share-c { background: var(--carbs); }
+
+.share-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 13px;
+}
+
+.share-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-radius: 50%;
+}
