@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { t } from '../i18n/uk';
 import type { Day, Entry, Profile } from '../lib/api';
 import { goalStatus } from '../lib/calc';
@@ -14,6 +14,8 @@ import {
   type ExtraKey,
 } from '../lib/extras';
 import { AchievementsSummary } from './Achievements';
+import { getMacroView, onMacroViewChange, type MacroView } from '../lib/prefs';
+import { ringFill, ringPercent } from '../lib/ring';
 import { Sheet } from './ui';
 
 function Ring({ eaten, goal, onOpen }: { eaten: number; goal: number; onOpen: () => void }) {
@@ -83,6 +85,56 @@ function MacroBar({
       <div className="bar">
         <div className="bar-fill st-fill" style={{ width: `${pct}%` }} />
       </div>
+    </button>
+  );
+}
+
+/** Один макронутрієнт у вигляді кільця: відсоток від цілі всередині, грами під кільцем. Колір — за тими самими зонами. */
+function MacroRing({ label, value, goal, onOpen }: { label: string; value: number; goal: number; onOpen: () => void }) {
+  const R = 40;
+  const C = 2 * Math.PI * R;
+  const status = goalStatus(value, goal);
+  const pct = ringPercent(value, goal, status);
+  return (
+    <button type="button" className={`mring st-${status}`} onClick={onOpen} title={STATUS_TEXT[status]}>
+      <span className="mring-wrap">
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <circle className="mring-bg" cx="50" cy="50" r={R} />
+          <circle
+            className="mring-fg"
+            cx="50"
+            cy="50"
+            r={R}
+            strokeDasharray={C}
+            strokeDashoffset={C * (1 - ringFill(value, goal))}
+            transform="rotate(-90 50 50)"
+          />
+        </svg>
+        <span className="mring-center">
+          {pct === null ? (
+            <span className="mring-pct">—</span>
+          ) : (
+            <span className="mring-pct">
+              {pct}
+              <small>%</small>
+            </span>
+          )}
+        </span>
+      </span>
+      <span className="mring-label">
+        {label} <span className="chev">›</span>
+      </span>
+      <span className="mring-grams">
+        {goal > 0 ? (
+          <>
+            <b>{fmtG(value)}</b> {t.home.of} {goal} {t.home.g}
+          </>
+        ) : (
+          <b>
+            {fmtG(value)} {t.home.g}
+          </b>
+        )}
+      </span>
     </button>
   );
 }
@@ -269,6 +321,8 @@ export function Home({
 }) {
   const [busy, setBusy] = useState(false);
   const [openMacro, setOpenMacro] = useState<Breakdown | null>(null);
+  const [macroView, setMacroViewState] = useState<MacroView>(getMacroView);
+  useEffect(() => onMacroViewChange(setMacroViewState), []);
   const [openExtra, setOpenExtra] = useState<ExtraKey | null>(null);
   const sum = totals(day.entries);
   const kcalGoal = profile.kcal_goal ?? 0;
@@ -302,6 +356,14 @@ export function Home({
       </section>
 
       <section className="card">
+        {macroView === 'rings' ? (
+          <div className="macro-rings">
+            <MacroRing label={t.home.protein} value={sum.protein} goal={profile.protein_goal_g ?? 0} onOpen={() => setOpenMacro('protein')} />
+            <MacroRing label={t.home.fat} value={sum.fat} goal={profile.fat_goal_g ?? 0} onOpen={() => setOpenMacro('fat')} />
+            <MacroRing label={t.home.carbs} value={sum.carbs} goal={profile.carbs_goal_g ?? 0} onOpen={() => setOpenMacro('carbs')} />
+          </div>
+        ) : (
+          <>
         <MacroBar
           label={t.home.protein}
           value={sum.protein}
@@ -320,6 +382,8 @@ export function Home({
           goal={profile.carbs_goal_g ?? 0}
           onOpen={() => setOpenMacro('carbs')}
         />
+          </>
+        )}
         <p className="muted small legend">{t.home.legend}</p>
       </section>
 
