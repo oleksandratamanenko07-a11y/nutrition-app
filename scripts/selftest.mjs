@@ -18,6 +18,7 @@ import { aggregateFrequent, cleanTemplateItems, orderedTimestamps, toTemplateIte
 import { descriptionStates, parseUsdaFoods, parseUsdaQuery, stateFit } from '../api/_lib/usda.ts';
 import { goalForDate, monthGrid, summarizeMonth } from '../src/lib/history.ts';
 import { dishTotals, dishPer100, weightIsPlausible, dishExtrasPer100 } from '../src/lib/recipe.ts';
+import { ringFill, ringPercent } from '../src/lib/ring.ts';
 import { CATEGORIES, normCategory } from '../api/_lib/library.ts';
 import { cleanExtra, knownExtras, parseExtras } from '../api/_lib/extras.ts';
 import { parseExtrasOff } from '../api/_lib/off.ts';
@@ -716,5 +717,21 @@ assert.equal(normCategory(undefined), null);
   assert.equal(r.total, 150 + 400 + 104);
   assert.equal(r.total, sum(es.map((e) => portion({ kcal: e.kcal_100, protein: e.protein_100, fat: e.fat_100, carbs: e.carbs_100 }, e.amount_g))).kcal, 'збігається з підсумком головної');
 }
+
+// ---------- кільця БЖУ ----------
+assert.equal(ringPercent(10, 100, goalStatus(10, 100)), 10);
+assert.equal(ringPercent(0, 134, goalStatus(0, 134)), 0);
+assert.equal(ringPercent(15.5, 267, goalStatus(15.5, 267)), 6);
+assert.equal(ringPercent(89.6, 100, goalStatus(89.6, 100)), 89, 'жовтий не показує 90');
+assert.equal(ringPercent(90, 100, goalStatus(90, 100)), 90);
+assert.equal(ringPercent(110, 100, goalStatus(110, 100)), 110);
+assert.equal(goalStatus(110.4, 100), 'high');
+assert.equal(ringPercent(110.4, 100, goalStatus(110.4, 100)), 111, 'колір червоний — відсоток не менше 111');
+assert.equal(ringPercent(110.6, 100, goalStatus(110.6, 100)), 111, 'червоний не показує 110');
+assert.equal(ringPercent(150, 100, goalStatus(150, 100)), 150);
+assert.equal(ringPercent(5, 0, 'low'), null, 'без цілі відсотка немає');
+assert.equal(ringFill(50, 100), 0.5);
+assert.equal(ringFill(150, 100), 1);
+assert.equal(ringFill(5, 0), 0);
 
 console.log('OK: усі перевірки пройдені');
