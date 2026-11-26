@@ -264,6 +264,10 @@ export interface Recipe {
   total_weight_g: number | null;
   is_public?: boolean;
   category?: Category | null;
+  /** Коментар автора цієї страви */
+  note?: string | null;
+  /** Знімок коментаря автора оригіналу (лише для читання) */
+  source_note?: string | null;
   ingredients: Ingredient[];
 }
 
@@ -287,6 +291,8 @@ export interface RecipeInput {
   total_weight_g: number | null;
   is_public?: boolean;
   category?: Category | null;
+  /** Коментар автора страви (до 500 символів); undefined — не змінювати, null — прибрати */
+  note?: string | null;
   /** Лише для нової страви-копії: з якої публічної страви скопійовано */
   source_id?: string | null;
   ingredients: Ingredient[];
