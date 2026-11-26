@@ -1546,3 +1546,117 @@ textarea {
   font: inherit;
   resize: vertical;
 }
+
+/* ---------- БЖУ кільцями ---------- */
+
+.macro-rings {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.mring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 2px 4px;
+  border: 0;
+  border-radius: 16px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.2s ease;
+}
+
+.mring:active {
+  background: var(--bg);
+}
+
+.mring-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 104px;
+  aspect-ratio: 1;
+}
+
+.mring-wrap svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.mring-bg {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 9;
+  opacity: 0.7;
+}
+
+.mring-fg {
+  fill: none;
+  stroke: var(--st, var(--accent));
+  stroke-width: 9;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.7s cubic-bezier(0.22, 1, 0.36, 1), stroke 0.3s ease;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--st, var(--accent)) 45%, transparent));
+}
+
+.mring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mring-pct {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--st, var(--text));
+}
+
+.mring-pct small {
+  margin-left: 1px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.mring-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mring-grams {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.mring-grams b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+@media (max-width: 340px) {
+  .mring-pct {
+    font-size: 20px;
+  }
+  .mring-grams {
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mring-fg {
+    transition: none;
+  }
+}
