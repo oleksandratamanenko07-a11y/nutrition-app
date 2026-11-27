@@ -1660,3 +1660,223 @@ textarea {
     transition: none;
   }
 }
+
+/* ---------- Головна: медаль, «+», швидке додавання, графік ---------- */
+
+.ring-stage {
+  position: relative;
+}
+
+.ring-stage .ring {
+  margin-top: 0;
+}
+
+.streak-medal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.streak-medal svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 6px rgba(224, 177, 0, 0.35));
+}
+
+.streak-medal.idle svg {
+  filter: none;
+  opacity: 0.55;
+}
+
+.plus-btn {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 30px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.plus-btn:active {
+  transform: scale(0.94);
+}
+
+.mealrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mealrow:last-child {
+  border-bottom: 0;
+}
+
+.mealrow-ic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--bg);
+  font-size: 21px;
+}
+
+.mealrow-t {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.mealrow-t b {
+  font-size: 16px;
+}
+
+.mealrow-go {
+  color: var(--muted);
+  font-size: 22px;
+}
+
+.quick-add {
+  margin: 0 0 12px;
+}
+
+.quick-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 4px 8px;
+}
+
+.quick-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.quick-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.quick-chip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.quick-chip:disabled {
+  opacity: 0.6;
+}
+
+.quick-chip b {
+  color: var(--accent);
+}
+
+.quick-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.week {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 96px;
+  padding-top: 6px;
+}
+
+.week-goal {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1.5px dashed var(--muted);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.week-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+}
+
+.week-bar {
+  width: 100%;
+  border-radius: 6px 6px 3px 3px;
+  background: var(--st, var(--border));
+  transition: height 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.week-bar.none {
+  background: var(--border);
+  opacity: 0.7;
+}
+
+.week-day {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.week-day.today {
+  color: var(--text);
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .week-bar {
+    transition: none;
+  }
+}
