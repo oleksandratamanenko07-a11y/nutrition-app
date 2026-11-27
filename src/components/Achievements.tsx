@@ -112,3 +112,35 @@ export function AchievementsFull({ days, today }: { days: string[]; today: strin
     </section>
   );
 }
+
+/** Медаль серії для кутка головної: лише значок із кількістю днів запису поспіль усередині */
+export function StreakMedal({ days, today, onClick }: { days: string[]; today: string; onClick?: () => void }) {
+  const n = computeAchievements(days, today).currentStreak;
+  const live = n > 0;
+  const color = live ? '#e0b100' : '#8a929c';
+  return (
+    <button
+      type="button"
+      className={`streak-medal ${live ? '' : 'idle'}`}
+      aria-label={t.home.streakAria.replace('{n}', String(n))}
+      onClick={onClick}
+    >
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="streakg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor={color} stopOpacity="0.6" />
+            <stop offset="0.5" stopColor={color} />
+            <stop offset="1" stopColor={color} stopOpacity="0.8" />
+          </linearGradient>
+        </defs>
+        <path d="M20 4h10l4 16-8 4z" fill={color} opacity="0.8" />
+        <path d="M44 4H34l-4 16 8 4z" fill={color} opacity="0.55" />
+        <circle cx="32" cy="38" r="21" fill="url(#streakg)" />
+        <circle cx="32" cy="38" r="16" fill="none" stroke="#fff" strokeOpacity="0.55" strokeWidth="2" />
+        <text x="32" y="45" textAnchor="middle" fontSize={n >= 100 ? 16 : n >= 10 ? 20 : 23} fontWeight="700" fill="#fff">
+          {n}
+        </text>
+      </svg>
+    </button>
+  );
+}
