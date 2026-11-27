@@ -15,6 +15,9 @@ export interface FoodProduct {
   fiber_100: number | null;
   sugar_100: number | null;
   salt_100: number | null;
+  /** Порція (лише для збережених продуктів): вага в грамах і назва */
+  portion_g?: number | null;
+  portion_name?: string | null;
   source: 'saved' | 'openfoodfacts' | 'usda';
   /** Для збережених продуктів: звідки вони з’явилися (manual / openfoodfacts / usda / recipe) */
   origin?: string | null;
