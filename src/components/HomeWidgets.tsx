@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { t } from '../i18n/uk';
 import { addEntry, frequentFoods, getRange, type Entry, type FrequentFood, type Meal } from '../lib/api';
 import { goalStatus } from '../lib/calc';
-import { defaultMeal, fmtKcal, totals } from '../lib/day';
+import { defaultMeal, fmtG, fmtKcal, totals } from '../lib/day';
 import { goalForDate } from '../lib/history';
 import { barPx, lastDates, scaleMax, weekAverage, type WeekDay } from '../lib/week';
 import { errorText, MEALS, Sheet } from './ui';
@@ -50,6 +50,17 @@ export function MealMenu({
   );
 }
 
+/** Скільки додає тап по чипу: одну порцію, якщо вона задана, інакше останню використану кількість */
+export function chipAmount(f: FrequentFood): number {
+  return f.portion_g && f.portion_g > 0 ? f.portion_g : f.last_amount_g;
+}
+
+function chipAmountLabel(f: FrequentFood): string {
+  return f.portion_g && f.portion_g > 0
+    ? `1 ${f.portion_name || t.portion.default}`
+    : `${fmtG(f.last_amount_g)} ${t.home.g}`;
+}
+
 /** Стрічка частих продуктів: тап додає останню використану кількість у прийом їжі за часом доби */
 export function QuickAddStrip({
   date,
@@ -90,7 +101,7 @@ export function QuickAddStrip({
         date,
         meal,
         name: f.name,
-        amount_g: f.last_amount_g,
+        amount_g: chipAmount(f),
         kcal_100: f.kcal_100!,
         protein_100: f.protein_100!,
         fat_100: f.fat_100!,
@@ -125,6 +136,7 @@ export function QuickAddStrip({
           return (
             <button type="button" key={key} className="quick-chip" disabled={busy !== null} onClick={() => void add(f)}>
               <span className="quick-name">{f.name}</span>
+              <span className="quick-amount">{chipAmountLabel(f)}</span>
               <b>{done === key ? '✓' : '+'}</b>
             </button>
           );
