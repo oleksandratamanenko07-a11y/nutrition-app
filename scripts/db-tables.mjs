@@ -19,6 +19,7 @@ export function headers(key) {
   return h;
 }
 
+/** Адреса проєкту без зайвого: пробілів, кінцевих слешів і /rest/v1 (Supabase показує Data API саме з ним) */
 export function baseUrl(raw) {
-  return raw.replace(/\/+$/, '');
+  return raw.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/i, '').replace(/\/+$/, '');
 }
