@@ -166,6 +166,9 @@ export interface NewEntry {
   fiber_100?: number | null;
   sugar_100?: number | null;
   salt_100?: number | null;
+  /** Порція продукту: передайте, щоб зберегти (null — прибрати); не передавайте, щоб не змінювати */
+  portion_g?: number | null;
+  portion_name?: string | null;
 }
 
 export async function addEntry(input: NewEntry): Promise<Entry> {
@@ -222,6 +225,9 @@ export interface Food {
   fiber_100?: number | null;
   sugar_100?: number | null;
   salt_100?: number | null;
+  /** Порція збереженого продукту (null — не задано) */
+  portion_g?: number | null;
+  portion_name?: string | null;
   source: 'saved' | 'openfoodfacts' | 'usda';
   kcal_from_kj: boolean;
   suspicious: boolean;
