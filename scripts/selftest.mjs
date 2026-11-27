@@ -18,6 +18,7 @@ import { aggregateFrequent, cleanTemplateItems, orderedTimestamps, toTemplateIte
 import { descriptionStates, parseUsdaFoods, parseUsdaQuery, stateFit } from '../api/_lib/usda.ts';
 import { goalForDate, monthGrid, summarizeMonth } from '../src/lib/history.ts';
 import { dishTotals, dishPer100, weightIsPlausible, dishExtrasPer100 } from '../src/lib/recipe.ts';
+import { addDaysStr as wkAdd, barPx, lastDates, scaleMax, weekAverage } from '../src/lib/week.ts';
 import { ringFill, ringPercent } from '../src/lib/ring.ts';
 import { CATEGORIES, normCategory } from '../api/_lib/library.ts';
 import { cleanExtra, knownExtras, parseExtras } from '../api/_lib/extras.ts';
@@ -733,5 +734,21 @@ assert.equal(ringPercent(5, 0, 'low'), null, 'без цілі відсотка �
 assert.equal(ringFill(50, 100), 0.5);
 assert.equal(ringFill(150, 100), 1);
 assert.equal(ringFill(5, 0), 0);
+
+// ---------- графік 7 днів ----------
+assert.equal(wkAdd('2026-03-01', -1), '2026-02-28');
+assert.equal(wkAdd('2026-12-31', 1), '2027-01-01');
+assert.deepEqual(lastDates('2026-11-27'), ['2026-11-21', '2026-11-22', '2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27']);
+assert.equal(lastDates('2026-03-02').length, 7);
+assert.equal(lastDates('2026-03-02')[0], '2026-02-24');
+{
+  const wd = [{ date: 'a', kcal: 2000, goal: 2000 }, { date: 'b', kcal: null, goal: 2000 }, { date: 'c', kcal: 1000, goal: 2000 }];
+  assert.equal(weekAverage(wd), 1500, 'порожній день не рахується нулем');
+  assert.equal(weekAverage([{ date: 'x', kcal: null, goal: 1 }]), null);
+  assert.ok(scaleMax(wd) >= 2000);
+  assert.equal(barPx(null, 2000, 70), 3, 'порожній день — тонка риска');
+  assert.equal(barPx(2000, 2000, 70), 70);
+  assert.equal(barPx(1, 2000, 70), 3, 'мінімальна висота');
+}
 
 console.log('OK: усі перевірки пройдені');
