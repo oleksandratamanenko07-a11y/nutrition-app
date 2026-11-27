@@ -21,6 +21,7 @@ import type { Ingredient } from '../lib/recipe';
 import { DishAddForm } from './DishAdd';
 import { portion, sum } from '../lib/calc';
 import { fmtG, fmtKcal } from '../lib/day';
+import { formatCount, gramsFromPortions, portionCountFor, stepCount } from '../lib/portion';
 import { errorText, MealPicker, ok, parseNum, Sheet } from './ui';
 import { Scanner } from './Scanner';
 
@@ -44,6 +45,8 @@ export interface Draft {
   values: Record<Nutrient, string>;
   /** Клітковина, цукор, сіль на 100 г; порожній рядок — «не вказано» */
   extras: { fiber: string; sugar: string; salt: string };
+  /** Порція продукту: назва і вага в грамах (порожній рядок — не задано) */
+  portion: { name: string; grams: string };
   /** Поля, яких немає в базі продуктів — показуємо «не вказано», нічого не підставляємо */
   missing: Record<Nutrient, boolean>;
   fromKj: boolean;
@@ -63,6 +66,7 @@ export function emptyDraft(barcode: string | null = null): Draft {
     source: 'manual',
     values: { kcal: '', protein: '', fat: '', carbs: '' },
     extras: { fiber: '', sugar: '', salt: '' },
+    portion: { name: '', grams: '' },
     missing: { kcal: false, protein: false, fat: false, carbs: false },
     fromKj: false,
     suspicious: false,
@@ -87,6 +91,7 @@ export function draftFromFood(f: Food): Draft {
     source: f.source === 'openfoodfacts' ? 'openfoodfacts' : f.source === 'usda' ? 'usda' : 'manual',
     values: { kcal: str(v.kcal), protein: str(v.protein), fat: str(v.fat), carbs: str(v.carbs) },
     extras: { fiber: str(f.fiber_100 ?? null), sugar: str(f.sugar_100 ?? null), salt: str(f.salt_100 ?? null) },
+    portion: { name: f.portion_name ?? '', grams: str(f.portion_g ?? null) },
     missing: {
       kcal: v.kcal === null,
       protein: v.protein === null,
@@ -160,6 +165,16 @@ function ProductForm({
   const [name, setName] = useState(initial.name);
   const [values, setValues] = useState(initial.values);
   const [extras, setExtras] = useState(initial.extras);
+  const [pdef, setPdef] = useState(initial.portion);
+  // Порція: якщо задана, кількість можна вводити порціями (1; 1,5; 2…) замість грамів
+  const initPg = parseNum(initial.portion.grams);
+  const initHasPortion = ok(initPg, 0.01, 5000);
+  const initAmount = initial.amount ? parseNum(initial.amount) : null;
+  const initCount = initHasPortion && initAmount !== null ? portionCountFor(initAmount, initPg!) : null;
+  const [unit, setUnit] = useState<'g' | 'portion'>(
+    initHasPortion && (initAmount === null || initCount !== null) ? 'portion' : 'g',
+  );
+  const [count, setCount] = useState(initCount !== null ? formatCount(initCount) : '1');
   const [grams, setGrams] = useState(initial.amount ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -171,7 +186,18 @@ function ProductForm({
     fat: parseNum(values.fat),
     carbs: parseNum(values.carbs),
   };
-  const g = parseNum(grams);
+  // Вага порції: порожньо — не задано; некоректне значення — undefined
+  const pgNum = (() => {
+    if (pdef.grams.trim() === '') return null;
+    const x = parseNum(pdef.grams);
+    return ok(x, 0.01, 5000) ? x : undefined;
+  })();
+  const portionValid = pgNum !== undefined;
+  const hasPortion = typeof pgNum === 'number';
+  const portionWord = pdef.name.trim() || t.portion.default;
+  const byPortion = hasPortion && unit === 'portion';
+  const cnt = parseNum(count);
+  const g = byPortion ? (ok(cnt, 0.01, 1000) ? gramsFromPortions(cnt!, pgNum!) : null) : parseNum(grams);
   // клітковина, цукор, сіль: порожнє поле = «не вказано» (null), а не нуль
   const extraNum = (s: string): number | null | undefined => {
     if (s.trim() === '') return null;
@@ -181,7 +207,7 @@ function ProductForm({
   const ex = { fiber: extraNum(extras.fiber), sugar: extraNum(extras.sugar), salt: extraNum(extras.salt) };
   const extrasValid = ex.fiber !== undefined && ex.sugar !== undefined && ex.salt !== undefined;
   const valid =
-    extrasValid && name.trim() !== '' && ok(n.kcal, 0, 900) && ok(n.protein, 0, 100) && ok(n.fat, 0, 100) &&
+    extrasValid && portionValid && name.trim() !== '' && ok(n.kcal, 0, 900) && ok(n.protein, 0, 100) && ok(n.fat, 0, 100) &&
     ok(n.carbs, 0, 100) && ok(g, 0.01, 5000);
   const sumTooBig = ok(n.protein, 0, 100) && ok(n.fat, 0, 100) && ok(n.carbs, 0, 100) &&
     n.protein + n.fat + n.carbs > 105;
@@ -228,6 +254,8 @@ function ProductForm({
         fiber_100: ex.fiber ?? null,
         sugar_100: ex.sugar ?? null,
         salt_100: ex.salt ?? null,
+        portion_g: hasPortion ? pgNum : null,
+        portion_name: hasPortion && pdef.name.trim() ? pdef.name.trim() : null,
       });
       await onSaved();
     } catch (e) {
@@ -311,10 +339,101 @@ function ProductForm({
         {!extrasValid && <p className="error small">{t.extras.invalid}</p>}
       </details>
 
-      <label className="field">
-        <span>{t.diary.grams}</span>
-        <input inputMode="decimal" value={grams} onChange={(e) => setGrams(e.target.value)} />
-      </label>
+      <div className="field">
+        <span>{hasPortion ? t.portion.amount : t.diary.grams}</span>
+        {hasPortion && (
+          <div className="segmented" style={{ marginBottom: 8 }}>
+            <button
+              type="button"
+              className={unit === 'g' ? 'active' : ''}
+              onClick={() => {
+                if (unit === 'portion' && g !== null) setGrams(String(g));
+                setUnit('g');
+              }}
+            >
+              {t.portion.grams}
+            </button>
+            <button
+              type="button"
+              className={unit === 'portion' ? 'active' : ''}
+              onClick={() => {
+                if (unit === 'g') {
+                  const c = ok(g, 0.01, 5000) ? portionCountFor(g!, pgNum!) : null;
+                  setCount(c !== null ? formatCount(c) : '1');
+                }
+                setUnit('portion');
+              }}
+            >
+              {portionWord}
+            </button>
+          </div>
+        )}
+        {byPortion ? (
+          <>
+            <div className="stepper">
+              <button
+                type="button"
+                className="secondary"
+                aria-label={t.portion.minus}
+                onClick={() => setCount(formatCount(stepCount(ok(cnt, 0.01, 1000) ? cnt! : 1, -1)))}
+              >
+                −
+              </button>
+              <input inputMode="decimal" value={count} onChange={(e) => setCount(e.target.value)} />
+              <button
+                type="button"
+                className="secondary"
+                aria-label={t.portion.plus}
+                onClick={() => setCount(formatCount(stepCount(ok(cnt, 0.01, 1000) ? cnt! : 0, 1)))}
+              >
+                +
+              </button>
+            </div>
+            {g !== null && (
+              <p className="muted small">
+                {t.portion.sum
+                  .replace('{n}', formatCount(cnt!))
+                  .replace('{g}', fmtG(pgNum!))
+                  .replace('{total}', fmtG(g))}
+              </p>
+            )}
+          </>
+        ) : (
+          <input inputMode="decimal" value={grams} onChange={(e) => setGrams(e.target.value)} />
+        )}
+      </div>
+
+      {!onIngredient && (
+        <details className="extras-form" open={hasPortion}>
+          <summary>{t.portion.summary}</summary>
+          <div className="grid2">
+            <label className="field">
+              <span>{t.portion.name}</span>
+              <input
+                value={pdef.name}
+                maxLength={20}
+                placeholder={t.portion.namePlaceholder}
+                onChange={(e) => setPdef({ ...pdef, name: e.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span>{t.portion.weight}</span>
+              <input
+                inputMode="decimal"
+                value={pdef.grams}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  // Прибрали вагу порції під час вводу порціями — переходимо на грами, щоб не втратити кількість
+                  if (v.trim() === '' && unit === 'portion' && g !== null) setGrams(String(g));
+                  setPdef({ ...pdef, grams: v });
+                }}
+              />
+            </label>
+          </div>
+          <p className="muted small">{t.portion.hint}</p>
+          {!portionValid && <p className="error small">{t.portion.invalid}</p>}
+        </details>
+      )}
 
       {!onIngredient && (
         <label className="field">
