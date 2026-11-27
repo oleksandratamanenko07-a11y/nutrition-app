@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { t } from '../i18n/uk';
-import type { Day, Entry, Profile } from '../lib/api';
+import type { Day, Entry, Meal, Profile } from '../lib/api';
 import { goalStatus } from '../lib/calc';
 import { fmtG, fmtKcal, totals } from '../lib/day';
 import { macroBreakdown, type Breakdown } from '../lib/breakdown';
@@ -13,7 +13,9 @@ import {
   referenceFor,
   type ExtraKey,
 } from '../lib/extras';
-import { AchievementsSummary } from './Achievements';
+import { StreakMedal } from './Achievements';
+import { AddFlow } from './AddFlow';
+import { MealMenu, QuickAddStrip, WeekChart } from './HomeWidgets';
 import { getMacroView, onMacroViewChange, type MacroView } from '../lib/prefs';
 import { ringFill, ringPercent } from '../lib/ring';
 import { Sheet } from './ui';
@@ -312,13 +314,22 @@ export function Home({
   onWater,
   days,
   today,
+  date,
+  onChanged,
+  onOpenProfile,
 }: {
   profile: Profile;
   day: Day;
   onWater: (ml: number) => Promise<void>;
   days: string[] | null;
   today: string;
+  /** Обраний на головній день */
+  date: string;
+  onChanged: () => Promise<void>;
+  onOpenProfile: () => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [addMeal, setAddMeal] = useState<Meal | null>(null);
   const [busy, setBusy] = useState(false);
   const [openMacro, setOpenMacro] = useState<Breakdown | null>(null);
   const [macroView, setMacroViewState] = useState<MacroView>(getMacroView);
@@ -342,7 +353,13 @@ export function Home({
   return (
     <>
       <section className="card center-card">
-        <Ring eaten={sum.kcal} goal={kcalGoal} onOpen={() => setOpenMacro('kcal')} />
+        <div className="ring-stage">
+          {days && <StreakMedal days={days} today={today} onClick={onOpenProfile} />}
+          <button type="button" className="plus-btn" aria-label={t.home.addAria} onClick={() => setMenuOpen(true)}>
+            +
+          </button>
+          <Ring eaten={sum.kcal} goal={kcalGoal} onOpen={() => setOpenMacro('kcal')} />
+        </div>
         <div className="kcal-row">
           <div>
             <div className="kcal-num">{fmtKcal(sum.kcal)}</div>
@@ -410,7 +427,30 @@ export function Home({
           </button>
         </div>
       </section>
-      {days && <AchievementsSummary days={days} today={today} />}
+      <QuickAddStrip date={date} refreshKey={day.entries} onAdded={onChanged} />
+      <WeekChart today={today} kcalGoal={kcalGoal} refreshKey={day.entries} />
+      {menuOpen && (
+        <MealMenu
+          entries={day.entries}
+          isToday={date === today}
+          onClose={() => setMenuOpen(false)}
+          onPick={(m) => {
+            setMenuOpen(false);
+            setAddMeal(m);
+          }}
+        />
+      )}
+      {addMeal && (
+        <AddFlow
+          meal={addMeal}
+          date={date}
+          onClose={() => setAddMeal(null)}
+          onSaved={async () => {
+            setAddMeal(null);
+            await onChanged();
+          }}
+        />
+      )}
       {openExtra && (
         <ExtrasSheet k={openExtra} entries={day.entries} kcalGoal={profile.kcal_goal} onClose={() => setOpenExtra(null)} />
       )}
