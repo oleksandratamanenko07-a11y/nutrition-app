@@ -3,6 +3,7 @@ import { getUser } from './_lib/auth.js';
 import { db } from './_lib/supabase.js';
 import { orderedTimestamps } from './_lib/quick.js';
 import { knownExtras, parseExtras } from './_lib/extras.js';
+import { portionPatch } from './_lib/portion.js';
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -181,6 +182,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const details = { barcode, brand, country, image_url: image, source };
         // Клітковина, цукор, сіль — необов'язкові (null = «не вказано»)
         const extras = parseExtras(b);
+        const portion = portionPatch(b); // null — клієнт порцію не передавав, не чіпаємо
 
         // Продукт зберігаємо в особисту базу (без дублікатів).
         // За штрихкодом шукаємо спершу: виправлення користувача оновлюють збережений продукт.
@@ -215,7 +217,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let foodId: string | null = existingId;
         const now = new Date().toISOString();
         if (foodId) {
-          const patch: Record<string, unknown> = { last_used_at: now, name, ...values, ...knownExtras(extras) };
+          const patch: Record<string, unknown> = { last_used_at: now, name, ...values, ...knownExtras(extras), ...(portion ?? {}) };
           if (barcode) Object.assign(patch, details);
           if (source === 'manual') delete patch.source; // не затираємо походження збереженого продукту
           const { error: upError } = await supabase.from('foods').update(patch).eq('id', foodId).eq('owner_id', uid);
@@ -223,7 +225,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else {
           const { data: food, error: foodError } = await supabase
             .from('foods')
-            .insert({ owner_id: uid, name, last_used_at: now, ...values, ...extras, ...details })
+            .insert({ owner_id: uid, name, last_used_at: now, ...values, ...extras, ...details, ...(portion ?? {}) })
             .select('id')
             .single();
           if (foodError) throw foodError;
