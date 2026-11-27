@@ -29,7 +29,7 @@ jobs:
           test -n "$BACKUP_PASSPHRASE" || { echo "Не задано секрет BACKUP_PASSPHRASE"; exit 1; }
           STAMP=$(date -u +%Y-%m-%d)
           tar -czf "backup-$STAMP.tar.gz" backup
-          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+          openssl enc -aes-256-cbc -salt -md sha256 \
             -pass env:BACKUP_PASSPHRASE -in "backup-$STAMP.tar.gz" -out "backup-$STAMP.tar.gz.enc"
           rm -rf backup "backup-$STAMP.tar.gz"
           echo "STAMP=$STAMP" >> "$GITHUB_ENV"
