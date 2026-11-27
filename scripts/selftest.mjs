@@ -18,6 +18,8 @@ import { aggregateFrequent, cleanTemplateItems, orderedTimestamps, toTemplateIte
 import { descriptionStates, parseUsdaFoods, parseUsdaQuery, stateFit } from '../api/_lib/usda.ts';
 import { goalForDate, monthGrid, summarizeMonth } from '../src/lib/history.ts';
 import { dishTotals, dishPer100, weightIsPlausible, dishExtrasPer100 } from '../src/lib/recipe.ts';
+import { cleanPortion, portionPatch } from '../api/_lib/portion.ts';
+import { formatCount, gramsFromPortions, portionCountFor, stepCount } from '../src/lib/portion.ts';
 import { addDaysStr as wkAdd, barPx, lastDates, scaleMax, weekAverage } from '../src/lib/week.ts';
 import { ringFill, ringPercent } from '../src/lib/ring.ts';
 import { CATEGORIES, normCategory } from '../api/_lib/library.ts';
@@ -750,5 +752,34 @@ assert.equal(lastDates('2026-03-02')[0], '2026-02-24');
   assert.equal(barPx(2000, 2000, 70), 70);
   assert.equal(barPx(1, 2000, 70), 3, 'мінімальна висота');
 }
+
+// ---------- порції ----------
+assert.deepEqual(cleanPortion(50, 'шт.'), { portion_g: 50, portion_name: 'шт.' });
+assert.deepEqual(cleanPortion('33,3', '  скибка  '), { portion_g: 33.3, portion_name: 'скибка' });
+assert.deepEqual(cleanPortion(50, ''), { portion_g: 50, portion_name: null });
+assert.deepEqual(cleanPortion(0, 'шт'), { portion_g: null, portion_name: null }, 'нульова вага — порції немає');
+assert.deepEqual(cleanPortion(-5, 'шт'), { portion_g: null, portion_name: null });
+assert.deepEqual(cleanPortion(5001, 'шт'), { portion_g: null, portion_name: null });
+assert.deepEqual(cleanPortion('abc', 'шт'), { portion_g: null, portion_name: null });
+assert.equal(cleanPortion(10, 'x'.repeat(50)).portion_name.length, 20);
+assert.equal(portionPatch({ name: 'a' }), null, 'клієнт не передавав порцію — не змінюємо');
+assert.deepEqual(portionPatch({ portion_g: null }), { portion_g: null, portion_name: null }, 'явний null прибирає порцію');
+assert.deepEqual(portionPatch({ portion_g: 60, portion_name: 'шт.' }), { portion_g: 60, portion_name: 'шт.' });
+assert.equal(gramsFromPortions(2, 50), 100);
+assert.equal(gramsFromPortions(1.5, 33.3), 49.95);
+assert.equal(gramsFromPortions(3, 0.1), 0.3, 'без похибки з плаваючою комою');
+assert.equal(portionCountFor(100, 50), 2);
+assert.equal(portionCountFor(75, 50), 1.5);
+assert.equal(portionCountFor(60, 50), null, 'не кратно півпорції');
+assert.equal(portionCountFor(25, 50), 0.5);
+assert.equal(portionCountFor(10, 50), null);
+assert.equal(portionCountFor(100, 0), null);
+assert.equal(stepCount(1, 1), 2);
+assert.equal(stepCount(1, -1), 0.5);
+assert.equal(stepCount(2, -1), 1);
+assert.equal(stepCount(0.5, -1), 0.5, 'не нижче півпорції');
+assert.equal(stepCount(0.5, 1), 1.5);
+assert.equal(formatCount(1.5), '1,5');
+assert.equal(formatCount(2), '2');
 
 console.log('OK: усі перевірки пройдені');
