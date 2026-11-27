@@ -197,7 +197,16 @@ function Main({
           </div>
         )}
 
-        {day && tab === 'home' && <Home profile={profile} day={day} onWater={onWater} days={days} today={today} />}
+        {day && tab === 'home' && <Home
+            profile={profile}
+            day={day}
+            onWater={onWater}
+            days={days}
+            today={today}
+            date={date}
+            onChanged={() => reloadAll(true)}
+            onOpenProfile={() => setTab('profile')}
+          />}
         {day && tab === 'diary' && <Diary date={date} entries={day.entries} reload={reloadAll} />}
         {tab === 'dishes' && <Dishes today={today} onAdded={reloadAll} />}
         {tab === 'profile' && <ProfileTab profile={profile} onEdit={onEdit} onProfile={onProfile} days={days} today={today} />}
