@@ -29,14 +29,14 @@ jobs:
           test -n "$BACKUP_PASSPHRASE" || { echo "Не задано секрет BACKUP_PASSPHRASE"; exit 1; }
           STAMP=$(date -u +%Y-%m-%d)
           tar -czf "backup-$STAMP.tar.gz" backup
-          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
-            --symmetric --cipher-algo AES256 -o "backup-$STAMP.tar.gz.gpg" "backup-$STAMP.tar.gz"
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+            -pass env:BACKUP_PASSPHRASE -in "backup-$STAMP.tar.gz" -out "backup-$STAMP.tar.gz.enc"
           rm -rf backup "backup-$STAMP.tar.gz"
           echo "STAMP=$STAMP" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v4
         with:
           name: backup-${{ env.STAMP }}
-          path: backup-${{ env.STAMP }}.tar.gz.gpg
+          path: backup-${{ env.STAMP }}.tar.gz.enc
           retention-days: 90
           if-no-files-found: error
