@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/uk';
-import { ApiError, getDay, type Day, type Entry } from './api';
+import { ApiError, getDay, type Day, type Entry, type Meal } from './api';
 import { portion, round1, sum, type Per100 } from './calc';
 
 /** КБЖУ порції запису: значення на 100 г із запису × грами. */
@@ -14,6 +14,15 @@ export function entryPortion(e: Entry): Per100 {
 /** Сума записів без проміжного округлення. */
 export function totals(entries: Entry[]): Per100 {
   return sum(entries.map(entryPortion));
+}
+
+/** Приймання їжі за замовчуванням — за часом доби */
+export function defaultMeal(): Meal {
+  const h = new Date().getHours();
+  if (h < 11) return 'breakfast';
+  if (h < 16) return 'lunch';
+  if (h < 21) return 'dinner';
+  return 'snack';
 }
 
 export const fmtKcal = (x: number) => Math.round(x).toLocaleString('uk-UA');
