@@ -12,6 +12,7 @@ import { normalizeQuery, rankByTokens, tokenize } from './_lib/search.js';
 import { aggregateFrequent, type EntryRow } from './_lib/quick.js';
 import { parseUsdaFoods, parseUsdaQuery } from './_lib/usda.js';
 import { parseExtras } from './_lib/extras.js';
+import { cleanPortion } from './_lib/portion.js';
 
 const OFF_BASE = 'https://world.openfoodfacts.org';
 const USDA_BASE = 'https://api.nal.usda.gov/fdc/v1';
@@ -30,6 +31,8 @@ interface FoodRow {
   fiber_100?: number | string | null;
   sugar_100?: number | string | null;
   salt_100?: number | string | null;
+  portion_g?: number | string | null;
+  portion_name?: string | null;
   source?: string | null;
 }
 
@@ -51,6 +54,7 @@ function fromRow(r: FoodRow): FoodProduct {
     image_url: r.image_url,
     ...values,
     ...parseExtras(r),
+    ...cleanPortion(r.portion_g, r.portion_name),
     source: 'saved',
     origin: r.source ?? null,
     kcal_from_kj: false,
