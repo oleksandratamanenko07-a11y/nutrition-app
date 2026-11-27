@@ -384,7 +384,6 @@ export function Home({
         />
           </>
         )}
-        <p className="muted small legend">{t.home.legend}</p>
       </section>
 
       <ExtrasCard entries={day.entries} kcalGoal={profile.kcal_goal} onOpen={setOpenExtra} />
