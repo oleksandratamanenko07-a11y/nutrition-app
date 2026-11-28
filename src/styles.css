@@ -1912,3 +1912,221 @@ textarea {
   color: var(--muted);
   white-space: nowrap;
 }
+
+/* ---------- Спільні покупки ---------- */
+
+.shop {
+  padding-bottom: 80px;
+}
+
+.shop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.shop-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 22px;
+  text-align: left;
+}
+
+.shop-title small {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pair-btn {
+  flex: none;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+}
+
+.pair-btn.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.shop-progress {
+  margin: 4px 0 10px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.shop-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.shop-bar div {
+  height: 100%;
+  background: var(--st-ok);
+  transition: width 0.25s ease;
+}
+
+.shop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shop-item {
+  display: flex;
+  align-items: stretch;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.shop-item.done {
+  opacity: 0.6;
+}
+
+.shop-item.done .shop-name {
+  text-decoration: line-through;
+}
+
+.shop-check {
+  flex: none;
+  width: 60px;
+  min-height: 60px;
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: 22px;
+  position: relative;
+}
+
+.shop-check::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  z-index: 0;
+}
+
+.shop-item.done .shop-check::before {
+  background: var(--st-ok);
+  border-color: var(--st-ok);
+}
+
+.shop-item.done .shop-check {
+  z-index: 1;
+}
+
+.shop-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  padding: 10px 12px 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 17px;
+  text-align: left;
+}
+
+.shop-name {
+  font-weight: 600;
+}
+
+.shop-qty {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.shop-sub {
+  flex-basis: 100%;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.shop-bottom {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(62px + env(safe-area-inset-bottom));
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 8px 16px;
+  z-index: 9;
+  background: linear-gradient(to top, var(--bg) 70%, transparent);
+}
+
+.list-row {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 16px;
+  text-align: left;
+  padding: 14px 4px;
+}
+
+.list-row.sel {
+  font-weight: 700;
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.inline-form input {
+  flex: 1;
+}
+
+.inline-form button.secondary {
+  flex: none;
+}
+
+.unit-seg button {
+  padding: 10px 8px;
+}
+
+.invite-code {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  margin: 6px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.link-btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-weight: 600;
+}
