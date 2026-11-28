@@ -7,6 +7,7 @@ import { Diary } from './components/Diary';
 import { Home } from './components/Home';
 import { Onboarding } from './components/Onboarding';
 import { ProfileTab } from './components/ProfileTab';
+import { Shopping } from './components/Shopping';
 import { Dishes } from './components/Dishes';
 
 type State =
@@ -14,7 +15,7 @@ type State =
   | { kind: 'error'; message: string }
   | { kind: 'ready'; profile: Profile };
 
-type Tab = 'home' | 'diary' | 'dishes' | 'profile';
+type Tab = 'home' | 'diary' | 'dishes' | 'shopping' | 'profile';
 
 function addDays(date: string, n: number): string {
   const [y, m, d] = date.split('-').map(Number);
@@ -95,6 +96,14 @@ function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
           <path d="M8 7c0-1.5 1-1.5 1-3M12 7c0-1.5 1-1.5 1-3M16 7c0-1.5 1-1.5 1-3" />
         </svg>
         <span>{t.nav.dishes}</span>
+      </button>
+      <button type="button" className={tab === 'shopping' ? 'active' : ''} onClick={() => onChange('shopping')}>
+        <svg viewBox="0 0 24 24" {...icon} aria-hidden="true">
+          <path d="M3 4h2l2.4 11h10.2L20 7H6.2" />
+          <circle cx="9" cy="19.5" r="1.3" />
+          <circle cx="17" cy="19.5" r="1.3" />
+        </svg>
+        <span>{t.nav.shopping}</span>
       </button>
       <button type="button" className={tab === 'profile' ? 'active' : ''} onClick={() => onChange('profile')}>
         <svg viewBox="0 0 24 24" {...icon} aria-hidden="true">
@@ -209,6 +218,7 @@ function Main({
           />}
         {day && tab === 'diary' && <Diary date={date} entries={day.entries} reload={reloadAll} />}
         {tab === 'dishes' && <Dishes today={today} onAdded={reloadAll} />}
+        {tab === 'shopping' && <Shopping />}
         {tab === 'profile' && <ProfileTab profile={profile} onEdit={onEdit} onProfile={onProfile} days={days} today={today} />}
       </main>
       <TabBar tab={tab} onChange={setTab} />
