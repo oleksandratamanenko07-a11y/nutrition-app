@@ -10,6 +10,11 @@ export const TABLES = [
   { name: 'logged_days', pk: ['owner_id', 'day'] },
   { name: 'goal_history', pk: ['owner_id', 'effective_from'] },
   { name: 'meal_templates', pk: ['id'] },
+  { name: 'pairs', pk: ['id'] },
+  { name: 'pair_members', pk: ['telegram_id'] },
+  { name: 'pair_invites', pk: ['code'] },
+  { name: 'shopping_lists', pk: ['id'] },
+  { name: 'shopping_items', pk: ['id'] },
 ];
 
 export function headers(key) {
