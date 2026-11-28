@@ -136,7 +136,12 @@ export function issues(r: Review): { nutrient: Nutrient; status: Status }[] {
 
 const NAME: Record<Nutrient, string> = { kcal: 'Калорії', protein: 'Білки', fat: 'Жири', carbs: 'Вуглеводи' };
 
-export function reviewMessage(r: Review): string {
+export function reviewMessage(r: Review, tips: string[] = []): string {
+  const base = reviewBody(r);
+  return tips.length === 0 ? base : `${base}\n\n💡 Що можна зробити:\n${tips.map((x) => `• ${x}`).join('\n')}`;
+}
+
+function reviewBody(r: Review): string {
   const head = r.days < REVIEW_DAYS ? `📊 Харчування за ${REVIEW_DAYS} дні (записи за ${r.days} з них)` : `📊 Харчування за ${REVIEW_DAYS} дні`;
   const kcal = `${int(r.avg.kcal)} із ${int(r.goal.kcal!)} ккал`;
   const found = issues(r);
