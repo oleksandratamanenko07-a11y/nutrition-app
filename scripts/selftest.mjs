@@ -25,6 +25,8 @@ import { ringFill, ringPercent } from '../src/lib/ring.ts';
 import { CATEGORIES, normCategory } from '../api/_lib/library.ts';
 import { cleanExtra, knownExtras, parseExtras } from '../api/_lib/extras.ts';
 import { parseExtrasOff } from '../api/_lib/off.ts';
+import { cleanItem, fromBase, newInviteCode, normCode, planMerge, toBase } from '../api/_lib/shopping.ts';
+import { formatQty, groupHistory, progress, sortItems, timeLeft } from '../src/lib/shoppingCalc.ts';
 import { extraPct, extrasBreakdown, extrasTotal, extraZone, referenceFor } from '../src/lib/extras.ts';
 
 // --- Розрахунки ---
@@ -781,5 +783,71 @@ assert.equal(stepCount(0.5, -1), 0.5, 'не нижче півпорції');
 assert.equal(stepCount(0.5, 1), 1.5);
 assert.equal(formatCount(1.5), '1,5');
 assert.equal(formatCount(2), '2');
+
+// --- Спільні покупки ---
+assert.deepEqual(cleanItem({ name: '  Молоко  ', qty: 1.5, unit: 'l', comment: ' лактоза ' }), { name: 'Молоко', qty: 1.5, unit: 'l', comment: 'лактоза' });
+assert.deepEqual(cleanItem({ name: 'Хліб' }), { name: 'Хліб', qty: null, unit: null, comment: null });
+assert.deepEqual(cleanItem({ name: 'Яйця', qty: 10 }), { name: 'Яйця', qty: 10, unit: 'pcs', comment: null }, 'кількість без одиниці — штуки');
+assert.equal(cleanItem({ name: '' }), null);
+assert.equal(cleanItem({ name: 'x', qty: 0 }), null);
+assert.equal(cleanItem({ name: 'x', qty: -1, unit: 'g' }), null);
+assert.equal(cleanItem({ name: 'x', unit: 'g' }), null, 'одиниця без кількості');
+assert.equal(cleanItem({ name: 'x', qty: 1, unit: 'lb' }), null);
+assert.equal(cleanItem({ name: 'x'.repeat(81) }), null);
+assert.equal(cleanItem({ name: 'x', comment: 'c'.repeat(201) }), null);
+assert.deepEqual(toBase(2, 'kg'), { dim: 'mass', amount: 2000 });
+assert.deepEqual(toBase(1.5, 'l'), { dim: 'vol', amount: 1500 });
+assert.deepEqual(fromBase('mass', 1700), { qty: 1.7, unit: 'kg' });
+assert.deepEqual(fromBase('mass', 999), { qty: 999, unit: 'g' });
+assert.deepEqual(fromBase('vol', 2500), { qty: 2.5, unit: 'l' });
+// Об'єднання: г + кг, регістр, куплене не чіпаємо, штуки окремо від ваги
+{
+  const ex = [
+    { id: 'a', name: 'Борошно', qty: 0.5, unit: 'kg', bought: false },
+    { id: 'b', name: 'Цукор', qty: 200, unit: 'g', bought: true },
+    { id: 'c', name: 'Яйця', qty: 6, unit: 'pcs', bought: false },
+  ];
+  const plan = planMerge(ex, [
+    { name: 'борошно', qty: 700, unit: 'g' },
+    { name: 'Цукор', qty: 100, unit: 'g' },
+    { name: 'Яйця', qty: 300, unit: 'g' },
+    { name: 'Сіль', qty: 5, unit: 'g' },
+    { name: 'сіль', qty: 7, unit: 'g' },
+  ]);
+  assert.deepEqual(plan.updates, [{ id: 'a', qty: 1.2, unit: 'kg' }]);
+  assert.deepEqual(plan.inserts, [
+    { name: 'Цукор', qty: 100, unit: 'g' },
+    { name: 'Яйця', qty: 300, unit: 'g' },
+    { name: 'Сіль', qty: 12, unit: 'g' },
+  ]);
+}
+assert.deepEqual(planMerge([], [{ name: 'Молоко', qty: 600, unit: 'ml' }, { name: 'молоко', qty: 600, unit: 'ml' }]).inserts, [{ name: 'Молоко', qty: 1.2, unit: 'l' }]);
+// «й» і «и» не змішуються
+assert.equal(planMerge([{ id: 'x', name: 'Йогурт', qty: 100, unit: 'g', bought: false }], [{ name: 'Иогурт', qty: 100, unit: 'g' }]).updates.length, 0);
+const code = newInviteCode();
+assert.match(code, /^[A-Z2-9]{8}$/);
+assert.equal(normCode(' ab cd-efgh '), 'ABCDEFGH', 'пробіли, дефіси й регістр ігноруються');
+assert.equal(normCode('ABCDEFGI'), null, 'літери I/O немає в алфавіті');
+assert.equal(normCode(code.toLowerCase()), code);
+assert.equal(normCode('SHORT'), null);
+assert.equal(normCode(12345678), null);
+assert.equal(formatQty(1.5, 'kg'), '1,5 кг');
+assert.equal(formatQty(3, 'pcs'), '3 шт');
+assert.equal(formatQty(null, null), '');
+{
+  const items = [
+    { id: '1', bought: true, bought_at: '2026-01-01T10:00:00Z', created_at: '2026-01-01T08:00:00Z' },
+    { id: '2', bought: false, bought_at: null, created_at: '2026-01-01T09:00:00Z' },
+    { id: '3', bought: true, bought_at: '2026-01-01T11:00:00Z', created_at: '2026-01-01T07:00:00Z' },
+    { id: '4', bought: false, bought_at: null, created_at: '2026-01-01T06:00:00Z' },
+  ];
+  assert.deepEqual(sortItems(items).map((i) => i.id), ['4', '2', '3', '1']);
+  assert.deepEqual(progress(items), { bought: 2, total: 4, pct: 50 });
+  assert.deepEqual(progress([]), { bought: 0, total: 0, pct: 0 });
+}
+assert.equal(timeLeft('2026-01-01T12:00:00Z', Date.parse('2026-01-01T11:00:00Z')), '1 год 0 хв');
+assert.equal(timeLeft('2026-01-01T12:00:00Z', Date.parse('2026-01-01T11:55:00Z')), '5 хв');
+assert.equal(timeLeft('2026-01-01T12:00:00Z', Date.parse('2026-01-01T12:00:00Z')), null);
+assert.deepEqual(groupHistory([{ cleared_at: '2026-01-01T10:00:00Z' }, { cleared_at: '2026-01-02T10:00:00Z' }, { cleared_at: '2026-01-01T11:00:00Z' }]).map((g) => [g.day, g.items.length]), [['2026-01-02', 1], ['2026-01-01', 2]]);
 
 console.log('OK: усі перевірки пройдені');
