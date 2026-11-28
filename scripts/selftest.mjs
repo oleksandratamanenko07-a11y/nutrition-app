@@ -25,6 +25,7 @@ import { ringFill, ringPercent } from '../src/lib/ring.ts';
 import { CATEGORIES, normCategory } from '../api/_lib/library.ts';
 import { cleanExtra, knownExtras, parseExtras } from '../api/_lib/extras.ts';
 import { parseExtrasOff } from '../api/_lib/off.ts';
+import { buildAdvice } from '../api/_lib/advice.ts';
 import { cleanItem, fromBase, newInviteCode, normCode, planMerge, toBase } from '../api/_lib/shopping.ts';
 import { formatQty, groupHistory, progress, sortItems, timeLeft } from '../src/lib/shoppingCalc.ts';
 import { extraPct, extrasBreakdown, extrasTotal, extraZone, referenceFor } from '../src/lib/extras.ts';
@@ -849,5 +850,59 @@ assert.equal(timeLeft('2026-01-01T12:00:00Z', Date.parse('2026-01-01T11:00:00Z')
 assert.equal(timeLeft('2026-01-01T12:00:00Z', Date.parse('2026-01-01T11:55:00Z')), '5 хв');
 assert.equal(timeLeft('2026-01-01T12:00:00Z', Date.parse('2026-01-01T12:00:00Z')), null);
 assert.deepEqual(groupHistory([{ cleared_at: '2026-01-01T10:00:00Z' }, { cleared_at: '2026-01-02T10:00:00Z' }, { cleared_at: '2026-01-01T11:00:00Z' }]).map((g) => [g.day, g.items.length]), [['2026-01-02', 1], ['2026-01-01', 2]]);
+
+// --- Поради до аналітики ---
+{
+  const AG = [{ effective_from: '2026-01-01', kcal_goal: 2100, protein_goal_g: 120, fat_goal_g: 70, carbs_goal_g: 250 }];
+  const AE = (d, meal, name, g, k, p, f, c, s = null) => ({ entry_date: d, meal, name, amount_g: g, kcal_100: k, protein_100: p, fat_100: f, carbs_100: c, sugar_100: s });
+  const adv = (entries) => { const r = analyze(entries, AG, WIN); return { r, tips: buildAdvice(r, entries, WIN, AG) }; };
+
+  // у нормі — порад немає
+  assert.deepEqual(adv(day3(2100, 120, 70, 250)).tips, []);
+  // повідомлення без порад не змінюється
+  assert.equal(reviewMessage(okR, []), reviewMessage(okR));
+
+  // білка мало, у щоденнику є власний сирний продукт — радимо саме його, з розрахунком
+  const a1 = [];
+  for (const d of WIN) a1.push(AE(d, 'breakfast', 'Круасан', 90, 400, 7, 22, 42), AE(d, 'lunch', 'Паста', 350, 150, 5, 4, 24), AE(d, 'dinner', 'Сир кисломолочний', 150, 121, 17, 5, 3), AE(d, 'dinner', 'Хліб', 120, 250, 8, 2, 48), AE(d, 'snack', 'Шоколад', 60, 540, 6, 32, 55, 50));
+  const t1 = adv(a1).tips;
+  assert.match(t1[0], /«Сир кисломолочний» ≈200 г \(\+34 г білка, \+240 ккал\)/);
+  assert.match(t1[0], /сніданку: зараз у ньому лише ≈6 г білка/);
+  // власних білкових немає — загальний перелік із позначкою «приблизні»
+  const a2 = [];
+  for (const d of WIN) a2.push(AE(d, 'lunch', 'Макарони', 400, 150, 5, 1, 30), AE(d, 'dinner', 'Картопля', 500, 90, 2, 0.1, 20), AE(d, 'snack', 'Булка', 300, 280, 8, 4, 50));
+  assert.match(adv(a2).tips[0], /куряча грудка[^.]*значення приблизні/);
+
+  // перебір калорій: називаємо найбільше джерело й рахуємо, на скільки скоротити
+  const a3 = [];
+  for (const d of WIN) a3.push(AE(d, 'lunch', 'Піца', 300, 260, 11, 10, 32), AE(d, 'dinner', 'Курка з рисом', 400, 150, 15, 3, 22), AE(d, 'breakfast', 'Вівсянка', 250, 90, 3, 2, 15), AE(d, 'snack', 'Чіпси', 100, 540, 6, 35, 50), AE(d, 'snack', 'Печиво', 80, 480, 6, 20, 68));
+  const t3 = adv(a3).tips;
+  assert.match(t3[0], /Найбільше калорій дає «Піца»: ≈780 ккал на день/);
+  assert.match(t3[0], /скоротіть «Піца» приблизно на 55%/);
+  // дуже великий перебір — спершу перевірка записів
+  assert.match(adv(day3(4000, 120, 70, 250).map((e) => ({ ...e, name: 'Х' }))).tips[0], /перевірте записи/);
+
+  // глибокий недобір: тільки перевірка записів, жодних «додайте білок»
+  const a4 = [];
+  for (const d of WIN) a4.push(AE(d, 'breakfast', 'Йогурт', 150, 60, 4, 2, 6), AE(d, 'dinner', 'Салат', 300, 60, 3, 3, 6));
+  const t4 = adv(a4).tips;
+  assert.equal(t4.length, 1); assert.match(t4[0], /внесено всі прийоми їжі/);
+
+  // середнє в нормі, але один день вибивається
+  const a6 = [];
+  WIN.forEach((d, i) => { const m = i === 1 ? 1.36 : 1; a6.push(AE(d, 'lunch', 'Обід', 500 * m, 160, 20, 3, 22), AE(d, 'dinner', 'Вечеря', 500 * m, 150, 20, 4, 18), AE(d, 'snack', 'Горіхи', 100 * m, 500, 20, 40, 10)); });
+  const x6 = adv(a6);
+  assert.equal(x6.r.status.kcal, 'ok');
+  assert.ok(x6.tips.some((t) => /^Позавчора калорій було/.test(t)), 'стрибок за один день');
+
+  // не більше трьох порад, повідомлення вміщується в ліміт Telegram
+  const a7 = [];
+  for (const d of WIN) a7.push(AE(d, 'breakfast', 'Круасан', 200, 400, 7, 22, 42), AE(d, 'lunch', 'Бургер', 350, 260, 11, 12, 26), AE(d, 'snack', 'Цукерки', 150, 450, 3, 15, 75, 60), AE(d, 'dinner', 'Картопля фрі', 300, 310, 3.5, 15, 41), AE(d, 'dinner', 'Сир', 100, 120, 17, 5, 3));
+  const x7 = adv(a7);
+  assert.ok(x7.tips.length <= 3);
+  assert.ok(reviewMessage(x7.r, x7.tips).length < 2000);
+  // записи без назв (старі дані) — загальні поради, без падіння
+  assert.doesNotThrow(() => adv(day3(2500, 70, 100, 300)));
+}
 
 console.log('OK: усі перевірки пройдені');
