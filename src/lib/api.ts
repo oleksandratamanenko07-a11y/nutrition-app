@@ -68,13 +68,16 @@ export type ApiErrorKind = 'offline' | 'unauthorized' | 'invalid' | 'limit' | 's
 
 export class ApiError extends Error {
   kind: ApiErrorKind;
-  constructor(kind: ApiErrorKind) {
+  /** Код помилки з відповіді сервера (наприклад, invite_expired або conflict), якщо він був */
+  code: string | null;
+  constructor(kind: ApiErrorKind, code: string | null = null) {
     super(kind);
     this.kind = kind;
+    this.code = code;
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
@@ -87,10 +90,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   } catch {
     throw new ApiError('offline');
   }
-  if (res.status === 401) throw new ApiError('unauthorized');
-  if (res.status === 400) throw new ApiError('invalid');
-  if (res.status === 409) throw new ApiError('limit');
-  if (!res.ok) throw new ApiError('server');
+  if (!res.ok) {
+    let code: string | null = null;
+    try {
+      const j = (await res.json()) as { error?: unknown };
+      if (typeof j.error === 'string') code = j.error;
+    } catch {
+      /* тіло не JSON */
+    }
+    if (res.status === 401) throw new ApiError('unauthorized', code);
+    if (res.status === 400) throw new ApiError('invalid', code);
+    if (res.status === 409) throw new ApiError('limit', code);
+    throw new ApiError('server', code);
+  }
   return (await res.json()) as T;
 }
 
