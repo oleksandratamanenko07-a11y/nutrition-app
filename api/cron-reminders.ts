@@ -10,6 +10,7 @@ import {
   WEIGHT_RECENT_DAYS,
   type Due,
 } from './_lib/reminders.js';
+import { buildAdvice, type AdviceEntry } from './_lib/advice.js';
 import { analyze, reviewMessage, reviewWindow, type ReviewEntry, type ReviewGoal } from './_lib/review.js';
 
 interface Row {
@@ -122,11 +123,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const [entries, goals] = await Promise.all([
           supabase
             .from('diary_entries')
-            .select('entry_date,amount_g,kcal_100,protein_100,fat_100,carbs_100')
+            .select('entry_date,meal,name,amount_g,kcal_100,protein_100,fat_100,carbs_100,sugar_100')
             .eq('owner_id', uid)
-            .gte('entry_date', window[0])
+            // 14 днів: аналіз іде по 3 днях, а власні білкові продукти для порад беруться з довшої історії
+            .gte('entry_date', addDaysStr(window[0], -11))
             .lte('entry_date', window[window.length - 1])
-            .limit(2000),
+            .limit(3000),
           supabase
             .from('goal_history')
             .select('effective_from,kcal_goal,protein_goal_g,fat_goal_g,carbs_goal_g')
@@ -140,7 +142,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const review = analyze((entries.data ?? []) as ReviewEntry[], (goals.data ?? []) as ReviewGoal[], window);
           let sentReview = false;
           if (review && !stop) {
-            const result = await send(token, uid, reviewMessage(review));
+            let tips: string[] = [];
+            try {
+              tips = buildAdvice(review, (entries.data ?? []) as AdviceEntry[], window, (goals.data ?? []) as ReviewGoal[]);
+            } catch (e) {
+              console.error('advice error', e); // поради не критичні: без них повідомлення все одно піде
+            }
+            const result = await send(token, uid, reviewMessage(review, tips));
             if (result === 'sent') {
               stats.sent++;
               sentReview = true;
